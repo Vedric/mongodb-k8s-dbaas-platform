@@ -1,4 +1,4 @@
-# mongodb-k8s-dbaas-platform
+# 🍃 mongodb-k8s-dbaas-platform
 
 [![Lint](https://github.com/Vedric/mongodb-k8s-dbaas-platform/actions/workflows/lint.yaml/badge.svg)](https://github.com/Vedric/mongodb-k8s-dbaas-platform/actions/workflows/lint.yaml)
 [![Tests](https://github.com/Vedric/mongodb-k8s-dbaas-platform/actions/workflows/test.yaml/badge.svg)](https://github.com/Vedric/mongodb-k8s-dbaas-platform/actions/workflows/test.yaml)
@@ -6,7 +6,7 @@
 
 Enterprise-grade, self-service Database-as-a-Service (DBaaS) platform for MongoDB on Kubernetes. Provides production-ready stateful workload management including HA replica sets, sharded clusters, automated backups with PITR, full observability, CDC pipelines, multi-tenancy, and chaos-tested disaster recovery.
 
-## Architecture
+## 🏗️ Architecture
 
 ```mermaid
 graph TB
@@ -63,22 +63,22 @@ graph TB
     SCRAM --> RS
 ```
 
-## Key Features
+## ✨ Key Features
 
-- **HA Replica Sets** - 3-node replica sets with automated failover, managed by Percona Operator
-- **Sharded Clusters** - Full sharding topology (mongos, config servers, multiple shards)
-- **Self-Service Provisioning** - Crossplane XRD with t-shirt sizing (S/M/L) for product teams
-- **Multi-Tenancy** - Namespace isolation with NetworkPolicies, ResourceQuotas, and LimitRanges
-- **Automated Backups** - Daily snapshots + continuous oplog via PBM to S3-compatible storage
-- **Point-in-Time Recovery** - PITR with validated restore procedures and integrity checks
-- **Full Observability** - Prometheus metrics, Grafana dashboards, Fluent Bit + Loki log pipeline
-- **Critical Alerting** - PrometheusRules for replication lag, oplog window, disk pressure, failover
-- **CDC Pipeline** - MongoDB Change Streams via Debezium to Kafka with Go event consumer
-- **Security Hardening** - TLS everywhere, SCRAM-SHA-256 auth, encryption at rest, audit logging
-- **Vault Integration** - Dynamic credential rotation via HashiCorp Vault
-- **Chaos Testing** - Primary kill, PV deletion, network partition with recovery validation
+- 🔄 **HA Replica Sets** - 3-node replica sets with automated failover, managed by Percona Operator
+- 🧩 **Sharded Clusters** - Full sharding topology (mongos, config servers, multiple shards)
+- 🎫 **Self-Service Provisioning** - Crossplane XRD with t-shirt sizing (S/M/L) for product teams
+- 🏢 **Multi-Tenancy** - Namespace isolation with NetworkPolicies, ResourceQuotas, and LimitRanges
+- 💾 **Automated Backups** - Daily snapshots + continuous oplog via PBM to S3-compatible storage
+- ⏱️ **Point-in-Time Recovery** - PITR with validated restore procedures and integrity checks
+- 📊 **Full Observability** - Prometheus metrics, Grafana dashboards, Fluent Bit + Loki log pipeline
+- 🚨 **Critical Alerting** - PrometheusRules for replication lag, oplog window, disk pressure, failover
+- 📡 **CDC Pipeline** - MongoDB Change Streams via Debezium to Kafka with Go event consumer
+- 🔐 **Security Hardening** - TLS everywhere, SCRAM-SHA-256 auth, encryption at rest, audit logging
+- 🔑 **Vault Integration** - Dynamic credential rotation via HashiCorp Vault
+- 💥 **Chaos Testing** - Primary kill, PV deletion, network partition with recovery validation
 
-## Prerequisites
+## 📋 Prerequisites
 
 | Tool | Version | Purpose |
 |------|---------|---------|
@@ -92,7 +92,7 @@ graph TB
 | `shellcheck` | >= 0.9 | Shell script linting |
 | `pre-commit` | >= 3.6 | Git hooks |
 
-## Quick Start
+## 🚀 Quick Start
 
 ```bash
 # Clone the repository
@@ -113,7 +113,7 @@ make port-forward
 # Grafana: http://localhost:3000
 ```
 
-## Project Structure
+## 📁 Project Structure
 
 ```
 mongodb-k8s-dbaas-platform/
@@ -152,7 +152,7 @@ mongodb-k8s-dbaas-platform/
 └── Makefile               # Unified interface for all operations
 ```
 
-## Usage
+## 🎯 Usage
 
 Product teams provision MongoDB instances via a simple Crossplane claim:
 
@@ -171,46 +171,46 @@ spec:
 ```
 
 The platform automatically provisions:
-- Dedicated namespace with network isolation
-- MongoDB replica set sized according to the t-shirt profile
-- Backup schedules (daily snapshot + continuous oplog)
-- Monitoring integration (ServiceMonitor, dashboard)
-- Resource quotas and limit ranges
+- 📦 Dedicated namespace with network isolation
+- 🍃 MongoDB replica set sized according to the t-shirt profile
+- 💾 Backup schedules (daily snapshot + continuous oplog)
+- 📊 Monitoring integration (ServiceMonitor, dashboard)
+- 📏 Resource quotas and limit ranges
 
-## Observability
+## 📊 Observability
 
 | Dashboard | Metrics |
 |-----------|---------|
-| Replication | Replication lag, oplog window, member states, election events |
-| WiredTiger | Cache utilization, evictions, dirty pages, checkpoint duration |
-| Connections | Active/available connections, per-client breakdown, pool saturation |
-| Tenant Overview | Per-tenant resource consumption, request rates, storage usage |
+| **Replication** | Replication lag, oplog window, member states, election events |
+| **WiredTiger** | Cache utilization, evictions, dirty pages, checkpoint duration |
+| **Connections** | Active/available connections, per-client breakdown, pool saturation |
+| **Tenant Overview** | Per-tenant resource consumption, request rates, storage usage |
 
-Alerts fire on: replication lag > 10s, oplog window < 2h, disk > 80%, primary step-down, member down.
+🚨 Alerts fire on: replication lag > 10s, oplog window < 2h, disk > 80%, primary step-down, member down.
 
-## Backup & Disaster Recovery
+## 💾 Backup & Disaster Recovery
 
 | Metric | Target |
 |--------|--------|
-| RPO | 15 minutes (continuous oplog backup) |
-| RTO | 30 minutes (full restore + PITR replay) |
+| **RPO** | 15 minutes (continuous oplog backup) |
+| **RTO** | 30 minutes (full restore + PITR replay) |
 
 Backup strategy:
-- **Daily snapshots** via PBM to MinIO (S3-compatible)
-- **Continuous oplog** backup every 10 minutes for PITR granularity
-- **Automated restore validation** in CI with `dbHash` integrity checks
+- 📸 **Daily snapshots** via PBM to MinIO (S3-compatible)
+- 📝 **Continuous oplog** backup every 10 minutes for PITR granularity
+- ✅ **Automated restore validation** in CI with `dbHash` integrity checks
 
 See [runbook-backup-restore.md](docs/runbook-backup-restore.md) for procedures.
 
-## Security
+## 🔐 Security
 
-- **Encryption in transit**: TLS enforced on all replica set members and client connections (cert-manager)
-- **Encryption at rest**: WiredTiger encryption with key management
-- **Authentication**: SCRAM-SHA-256 with dynamic credential rotation via Vault
-- **Audit logging**: All auth events, CRUD operations, and DDL changes captured
-- **Network isolation**: NetworkPolicies enforce strict tenant boundaries
+- 🔒 **Encryption in transit**: TLS enforced on all replica set members and client connections (cert-manager)
+- 💾 **Encryption at rest**: WiredTiger encryption with key management
+- 🔑 **Authentication**: SCRAM-SHA-256 with dynamic credential rotation via Vault
+- 📋 **Audit logging**: All auth events, CRUD operations, and DDL changes captured
+- 🛡️ **Network isolation**: NetworkPolicies enforce strict tenant boundaries
 
-## Testing
+## 🧪 Testing
 
 ```bash
 make test          # Full bats test suite
@@ -220,23 +220,23 @@ make lint          # yamllint + shellcheck + helm lint
 ```
 
 Chaos scenarios covered:
-- Primary pod deletion with failover validation
-- PV loss with backup-based recovery
-- Network partition between replica set members
+- 💥 Primary pod deletion with failover validation
+- 💾 PV loss with backup-based recovery
+- 🌐 Network partition between replica set members
 
-## Architecture Decision Records
+## 📚 Architecture Decision Records
 
 | ADR | Title | Status |
 |-----|-------|--------|
-| [ADR-001](docs/decisions/ADR-001-percona-vs-community-operator.md) | Percona vs Community Operator | Accepted |
-| [ADR-002](docs/decisions/ADR-002-storage-class-selection.md) | Storage Class Selection | Accepted |
-| [ADR-003](docs/decisions/ADR-003-crossplane-vs-argocd-appset.md) | Crossplane vs ArgoCD ApplicationSet | Accepted |
-| [ADR-004](docs/decisions/ADR-004-backup-strategy-pbm.md) | Backup Strategy with PBM | Accepted |
-| [ADR-005](docs/decisions/ADR-005-self-service-xrd-design.md) | Self-Service XRD Design | Accepted |
-| [ADR-006](docs/decisions/ADR-006-cdc-debezium-vs-change-streams.md) | CDC: Debezium vs Change Streams | Accepted |
-| [ADR-007](docs/decisions/ADR-007-chaos-testing-approach.md) | Chaos Testing Approach | Accepted |
+| [ADR-001](docs/decisions/ADR-001-percona-vs-community-operator.md) | Percona vs Community Operator | ✅ Accepted |
+| [ADR-002](docs/decisions/ADR-002-storage-class-selection.md) | Storage Class Selection | ✅ Accepted |
+| [ADR-003](docs/decisions/ADR-003-crossplane-vs-argocd-appset.md) | Crossplane vs ArgoCD ApplicationSet | ✅ Accepted |
+| [ADR-004](docs/decisions/ADR-004-backup-strategy-pbm.md) | Backup Strategy with PBM | ✅ Accepted |
+| [ADR-005](docs/decisions/ADR-005-self-service-xrd-design.md) | Self-Service XRD Design | ✅ Accepted |
+| [ADR-006](docs/decisions/ADR-006-cdc-debezium-vs-change-streams.md) | CDC: Debezium vs Change Streams | ✅ Accepted |
+| [ADR-007](docs/decisions/ADR-007-chaos-testing-approach.md) | Chaos Testing Approach | ✅ Accepted |
 
-## Cross-Project Integration
+## 🔗 Cross-Project Integration
 
 This platform integrates with a broader platform engineering portfolio:
 
@@ -248,7 +248,7 @@ This platform integrates with a broader platform engineering portfolio:
 | `secure-cicd-platform` | Trivy scanning of CDC consumer image |
 | `aws-eks-production-platform` | EKS deployment variant with EBS CSI tuning |
 
-## Contributing
+## 🤝 Contributing
 
 1. Branch from `develop` using the naming convention: `feat/<scope>-<desc>`, `fix/<scope>-<desc>`, `docs/<desc>`
 2. Follow [Conventional Commits](https://www.conventionalcommits.org/) for commit messages
@@ -257,6 +257,6 @@ This platform integrates with a broader platform engineering portfolio:
 
 See the coding standards section in the project documentation for detailed conventions.
 
-## License
+## 📄 License
 
 This project is licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.
