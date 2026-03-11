@@ -1,0 +1,22 @@
+---
+# Strimzi Kafka Operator namespace and deployment reference.
+# The Strimzi operator manages Kafka clusters, topics, users, and
+# Kafka Connect instances as Kubernetes Custom Resources.
+#
+# Installation via Helm:
+#   helm repo add strimzi https://strimzi.io/charts/
+#   helm install strimzi-kafka-operator strimzi/strimzi-kafka-operator \
+#     --namespace kafka --create-namespace --wait
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kafka
+  labels:
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/component: cdc
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: strimzi
+  annotations:
+    description: >-
+      Namespace for the Strimzi Kafka operator and CDC pipeline components.
+      Hosts Kafka brokers, Kafka Connect, and Debezium connectors.
