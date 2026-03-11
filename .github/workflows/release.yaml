@@ -78,6 +78,8 @@ jobs:
 
       - name: Install Helm
         uses: azure/setup-helm@v4
+        with:
+          version: v3.14.0
 
       - name: Deploy Percona Operator
         run: |
@@ -102,7 +104,8 @@ jobs:
 
       - name: Install bats
         run: |
-          sudo apt-get update && sudo apt-get install -y bats
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq bats jq
 
       - name: Run bats tests
         run: bats tests/bats/test_replicaset_health.bats

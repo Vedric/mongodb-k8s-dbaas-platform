@@ -1,10 +1,10 @@
-# 💾 ADR-002: Storage Class Selection for MongoDB Workloads
+# ADR-002: Storage Class Selection for MongoDB Workloads
 
-## 📌 Status
+## Status
 
 **Accepted**
 
-## 🔍 Context
+## Context
 
 MongoDB is an I/O-intensive stateful workload. The choice of StorageClass directly impacts database performance, data durability, and operational behavior during pod scheduling and rescheduling. Key parameters to decide:
 
@@ -13,7 +13,7 @@ MongoDB is an I/O-intensive stateful workload. The choice of StorageClass direct
 3. **Filesystem vs Block** - Volume mode
 4. **Provisioner** - Cloud-specific or local
 
-### 🔗 Volume binding mode
+### Volume binding mode
 
 | Mode | Behavior | Trade-off |
 |------|----------|-----------|
@@ -22,7 +22,7 @@ MongoDB is an I/O-intensive stateful workload. The choice of StorageClass direct
 
 For MongoDB, data locality is critical. Cross-zone storage access introduces latency that directly impacts write performance and replication lag. With `WaitForFirstConsumer`, the scheduler places the pod first, then provisions storage on the same node/zone.
 
-### ♻️ Reclaim policy
+### Reclaim policy
 
 | Policy | Behavior | Trade-off |
 |--------|----------|-----------|
@@ -31,11 +31,11 @@ For MongoDB, data locality is critical. Cross-zone storage access introduces lat
 
 For a database workload, accidental PVC deletion should not automatically destroy the underlying data. The backup strategy (ADR-004) provides the primary data protection mechanism, but `Retain` adds a defense-in-depth layer.
 
-### 📂 Filesystem vs Block
+### Filesystem vs Block
 
 MongoDB uses the WiredTiger storage engine, which manages its own data files and memory-mapped I/O. It operates on regular files within a filesystem, not raw block devices. Using `Filesystem` mode is the standard and recommended approach.
 
-### ⚡ Performance considerations
+### Performance considerations
 
 MongoDB performance is sensitive to:
 
@@ -50,7 +50,7 @@ Storage benchmarks using `fio` will be documented in `docs/benchmarks/fio-storag
 - fsync latency (simulates journal commits)
 - Mixed workload (70% read / 30% write)
 
-## ✅ Decision
+## Decision
 
 We configure the StorageClass for MongoDB workloads with the following parameters:
 
@@ -79,22 +79,22 @@ Key choices:
 
 For local development with `kind`, the `rancher.io/local-path` provisioner is used with the same binding and reclaim settings where supported.
 
-## 📊 Consequences
+## Consequences
 
-### ✅ What becomes easier
+### What becomes easier
 
 - Pod scheduling respects data locality, eliminating cross-zone storage latency
 - Volume expansion can be done without downtime
 - Accidental PVC deletion does not destroy data
 - Consistent storage configuration across development and production
 
-### ⚠️ What becomes harder
+### What becomes harder
 
 - `Retain` policy requires manual cleanup of orphaned PVs after intentional decommission (mitigated by runbook)
 - `WaitForFirstConsumer` means PVCs remain `Pending` until a pod is scheduled, which can initially confuse operators (mitigated by documentation)
 - Storage provisioner differences between `kind` (local-path) and production (cloud CSI) mean some behavior cannot be fully tested locally
 
-### 📝 Benchmark Results
+### Benchmark Results
 
 Storage benchmarks have been completed and validate the chosen StorageClass configuration. Full results with methodology, raw data, and t-shirt size recommendations are available in [fio-storage-results.md](../benchmarks/fio-storage-results.md).
 
@@ -103,6 +103,6 @@ Key findings:
 - gp3 provisioned (10,000 IOPS) required for L workloads with sub-millisecond fsync
 - All journal fsync latency targets met across configurations
 
-### 📝 Open items
+### Open items
 
 - Cloud-specific provisioner parameters to be documented per target environment

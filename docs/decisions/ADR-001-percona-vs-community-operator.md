@@ -1,10 +1,10 @@
-# 🏗️ ADR-001: Percona Server for MongoDB Operator vs MongoDB Community Operator
+# ADR-001: Percona Server for MongoDB Operator vs MongoDB Community Operator
 
-## 📌 Status
+## Status
 
 **Accepted**
 
-## 🔍 Context
+## Context
 
 Deploying MongoDB on Kubernetes requires a mature operator to manage the lifecycle of replica sets, sharded clusters, backups, and upgrades. Two primary open-source options exist:
 
@@ -21,7 +21,7 @@ The platform requires:
 - Production-grade resource management (affinity, tolerations, resource limits)
 - Active upstream maintenance and community
 
-### ⚖️ Licensing comparison
+### Licensing comparison
 
 | Aspect | MongoDB Community Operator | Percona Operator |
 |--------|--------------------------|------------------|
@@ -31,7 +31,7 @@ The platform requires:
 
 The SSPL license on MongoDB Community Edition introduces legal ambiguity for organizations offering database services (internal or external). Percona Server for MongoDB is a fully Apache 2.0 licensed drop-in replacement, removing this concern entirely.
 
-### 🔧 Feature comparison
+### Feature comparison
 
 | Feature | MongoDB Community Operator | Percona Operator |
 |---------|--------------------------|------------------|
@@ -47,7 +47,7 @@ The SSPL license on MongoDB Community Edition introduces legal ambiguity for org
 | Helm chart | ✅ | ✅ |
 | Kustomize support | Limited | Full |
 
-### 📈 Maintenance and community
+### Maintenance and community
 
 | Metric | MongoDB Community Operator | Percona Operator |
 |--------|--------------------------|------------------|
@@ -57,7 +57,7 @@ The SSPL license on MongoDB Community Edition introduces legal ambiguity for org
 | Production references | Limited public references | Widely used in enterprise (banking, telecom) |
 | Documentation quality | Basic | Comprehensive with runbooks |
 
-## ✅ Decision
+## Decision
 
 We adopt the **Percona Server for MongoDB Operator** as the primary operator for this platform.
 
@@ -73,21 +73,21 @@ Key drivers:
 
 5. **Observability integration** - Built-in support for Percona MongoDB Exporter and PMM reduces the effort to build a monitoring stack.
 
-## 📊 Consequences
+## Consequences
 
-### ✅ What becomes easier
+### What becomes easier
 
 - Backup and PITR configuration is declarative and operator-managed
 - Sharded clusters can be deployed with the same tooling as replica sets
 - No licensing concerns for any deployment model
 - Monitoring exporters are pre-configured in the CR
 
-### ⚠️ What becomes harder
+### What becomes harder
 
 - Teams familiar with the MongoDB Community Operator will need to learn the Percona CR schema (though it is well-documented)
 - Percona Server for MongoDB has minor behavioral differences compared to MongoDB Community Edition (mostly around default configurations and monitoring endpoints)
 - Dependency on Percona's release cycle for operator and server version updates
 
-### 🚨 Risks
+### Risks
 
 - If Percona significantly changes their licensing or support model, migration to an alternative operator would require CR schema migration. This risk is mitigated by the Apache 2.0 license and the active fork ecosystem.

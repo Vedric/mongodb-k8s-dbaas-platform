@@ -1,10 +1,10 @@
-# 💾 ADR-004: Backup Strategy with Percona Backup for MongoDB (PBM)
+# ADR-004: Backup Strategy with Percona Backup for MongoDB (PBM)
 
-## 📌 Status
+## Status
 
 **Accepted**
 
-## 🔍 Context
+## Context
 
 The platform requires a robust backup strategy that supports:
 
@@ -37,7 +37,7 @@ The platform requires a robust backup strategy that supports:
 - PITR requires additional oplog capture mechanism
 - Snapshot coordination across replica set members is complex
 
-## ✅ Decision
+## Decision
 
 We adopt **Percona Backup for MongoDB (PBM)** with a two-tier backup schedule:
 
@@ -86,23 +86,23 @@ Every restore operation (manual or CI) must include:
 
 This validation is automated in the CI pipeline (`tests/ci/backup-restore-ephemeral.sh`).
 
-## 📊 Consequences
+## Consequences
 
-### ✅ What becomes easier
+### What becomes easier
 
 - PITR is available out of the box with 10-minute granularity
 - Backup/restore is declarative (configured in the Percona CR)
 - Same backup tooling works across local, cloud, and hybrid deployments
 - Operator handles backup agent lifecycle (no separate deployment needed)
 
-### ⚠️ What becomes harder
+### What becomes harder
 
 - PBM requires a dedicated S3-compatible storage endpoint (MinIO for local)
 - Oplog continuous backup adds I/O overhead (~5-10% on write-heavy workloads)
 - Restore to a different cluster name requires additional configuration
 - PBM version must be kept in sync with the Percona Operator version
 
-### 🚨 Risks
+### Risks
 
 - MinIO single-node deployment (local) is not production-grade. For production, use managed S3 or a multi-node MinIO cluster
 - Oplog backup interval of 10 minutes means worst-case RPO is 10 minutes. For sub-minute RPO, reduce the interval (at the cost of increased storage I/O)
