@@ -1,12 +1,12 @@
-# 📊 Storage Benchmark Results (fio)
+# Storage Benchmark Results (fio)
 
-## 🎯 Objective
+## Objective
 
 Validate that the selected StorageClass meets MongoDB's I/O requirements for production workloads. These benchmarks measure IOPS, throughput, and latency characteristics relevant to the WiredTiger storage engine.
 
 > **Reference**: [ADR-002 - Storage Class Selection](../decisions/ADR-002-storage-class-selection.md)
 
-## 🧪 Methodology
+## Methodology
 
 ### Test Environment
 
@@ -99,7 +99,7 @@ fio --name=mixed-oltp \
     --filename=/data/fio-test
 ```
 
-## 📈 Results
+## Results
 
 ### kind (local-path provisioner)
 
@@ -134,7 +134,7 @@ fio --name=mixed-oltp \
 | fsync Latency (4K) | - | ~2,800 | - | 10.9 MB/s | 0.35 ms |
 | Mixed OLTP (8K) | ~6,200 | ~2,650 | 48 MB/s | 20.7 MB/s | 3.8 ms |
 
-## 🔍 Analysis
+## Analysis
 
 ### MongoDB I/O Requirements vs Results
 
@@ -153,7 +153,7 @@ fio --name=mixed-oltp \
 
 3. **kind (development)**: Local storage exceeds all targets due to host SSD/NVMe, but is not representative. Always validate on the target cloud provider before production deployment.
 
-## 🔁 Reproducing Benchmarks
+## Reproducing Benchmarks
 
 Deploy a fio test pod on the target StorageClass:
 

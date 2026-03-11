@@ -1,6 +1,6 @@
-# 🔒 TLS Configuration for MongoDB
+# TLS Configuration for MongoDB
 
-## 📌 Overview
+## Overview
 
 All MongoDB communications are encrypted using TLS 1.2+ certificates managed by [cert-manager](https://cert-manager.io/). This covers:
 
@@ -8,7 +8,7 @@ All MongoDB communications are encrypted using TLS 1.2+ certificates managed by 
 - **Client connections**: Application-to-MongoDB connections via mongos or direct to replica set
 - **Sharded cluster**: All traffic between mongos, config servers, and shard replica sets
 
-## 🏗️ Certificate Architecture
+## Certificate Architecture
 
 ```
 ClusterIssuer (self-signed)
@@ -40,7 +40,7 @@ Issuer (mongodb-tls-issuer, per namespace)
 | Key encoding | PKCS8 | Required by Percona Operator |
 | Usages | server auth, client auth | Mutual TLS between members |
 
-## 🔧 Integration with Percona Operator
+## Integration with Percona Operator
 
 The Percona Operator references TLS secrets in the PerconaServerMongoDB CR:
 
@@ -53,14 +53,14 @@ spec:
 
 > **Note**: The `ssl` and `sslInternal` secrets must contain `tls.crt`, `tls.key`, and `ca.crt` keys. cert-manager populates these automatically.
 
-## ⚠️ Production Considerations
+## Production Considerations
 
 1. **Replace the self-signed CA** with an organization-managed CA or Vault PKI backend for production deployments
 2. **Monitor certificate expiry** using the Prometheus cert-manager exporter (`cert_manager_certificate_expiration_timestamp_seconds`)
 3. **Test certificate rotation** before deploying to production - cert-manager handles renewal automatically, but the Percona Operator must be configured to detect and reload certificates
 4. **Client certificates**: For applications requiring mTLS, issue additional certificates from the same CA using cert-manager
 
-## 📋 Deployment Order
+## Deployment Order
 
 1. Install cert-manager (prerequisite)
 2. Apply `issuer.yaml` (ClusterIssuer + CA Certificate + Namespace Issuer)
