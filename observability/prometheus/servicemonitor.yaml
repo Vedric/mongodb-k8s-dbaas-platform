@@ -1,0 +1,68 @@
+---
+# ServiceMonitor for Prometheus to scrape MongoDB exporter metrics.
+# Targets all MongoDB pods exposing metrics on port 9216.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: mongodb-exporter
+  namespace: mongodb
+  labels:
+    app.kubernetes.io/name: mongodb-exporter
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: platform-team
+    release: prometheus
+  annotations:
+    description: >-
+      Prometheus ServiceMonitor for MongoDB exporter. Scrapes metrics
+      from the mongodb-exporter sidecar on all replica set members.
+spec:
+  jobLabel: mongodb
+  namespaceSelector:
+    matchNames:
+      - mongodb
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: mongod
+  endpoints:
+    - port: metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      path: /metrics
+      honorLabels: true
+      metricRelabelings:
+        # Drop high-cardinality metrics to control storage
+        - sourceLabels: [__name__]
+          regex: "mongodb_mongod_metrics_cursor_.*"
+          action: drop
+---
+# ServiceMonitor for sharded cluster mongos instances
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: mongodb-mongos-exporter
+  namespace: mongodb-sharded
+  labels:
+    app.kubernetes.io/name: mongodb-mongos-exporter
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: platform-team
+    release: prometheus
+  annotations:
+    description: >-
+      Prometheus ServiceMonitor for MongoDB mongos exporter.
+      Scrapes metrics from mongos router instances.
+spec:
+  jobLabel: mongodb-mongos
+  namespaceSelector:
+    matchNames:
+      - mongodb-sharded
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: mongos
+  endpoints:
+    - port: metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      path: /metrics
+      honorLabels: true

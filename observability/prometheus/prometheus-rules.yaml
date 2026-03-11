@@ -1,0 +1,71 @@
+---
+# PrometheusRule for MongoDB recording rules.
+# These pre-compute frequently used metrics to improve
+# dashboard performance and alert evaluation speed.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: mongodb-recording-rules
+  namespace: mongodb
+  labels:
+    app.kubernetes.io/name: mongodb-recording-rules
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: platform-team
+    release: prometheus
+  annotations:
+    description: >-
+      Recording rules for MongoDB metrics. Pre-computes replication lag,
+      connection utilization, operation rates, and cache hit ratios.
+spec:
+  groups:
+    - name: mongodb.recording.rules
+      interval: 30s
+      rules:
+        # Replication lag in seconds
+        - record: mongodb:replication_lag:seconds
+          expr: |
+            mongodb_mongod_replset_member_optime_date{state="PRIMARY"}
+            - on(set) group_left()
+            mongodb_mongod_replset_member_optime_date{state="SECONDARY"}
+
+        # Operations per second by type (insert, query, update, delete, command)
+        - record: mongodb:opcounters:rate5m
+          expr: |
+            rate(mongodb_mongod_metrics_document_total[5m])
+
+        # Connection utilization percentage
+        - record: mongodb:connections:utilization_percent
+          expr: |
+            (mongodb_mongod_connections{state="current"}
+            / mongodb_mongod_connections{state="available"}) * 100
+
+        # WiredTiger cache hit ratio
+        - record: mongodb:wiredtiger:cache_hit_ratio
+          expr: |
+            rate(mongodb_mongod_wiredtiger_cache_bytes_read_into_total[5m])
+            / (rate(mongodb_mongod_wiredtiger_cache_bytes_read_into_total[5m])
+            + rate(mongodb_mongod_wiredtiger_cache_bytes_written_from_total[5m]))
+
+        # WiredTiger dirty cache percentage
+        - record: mongodb:wiredtiger:dirty_cache_percent
+          expr: |
+            (mongodb_mongod_wiredtiger_cache_tracked_dirty_bytes
+            / mongodb_mongod_wiredtiger_cache_max_bytes) * 100
+
+        # Average query execution time (from slow query profiler)
+        - record: mongodb:query:avg_execution_ms
+          expr: |
+            rate(mongodb_mongod_op_latencies_latency_total{type="reads"}[5m])
+            / rate(mongodb_mongod_op_latencies_ops_total{type="reads"}[5m])
+            / 1000
+
+        # Total data size across all databases (GB)
+        - record: mongodb:storage:data_size_gb
+          expr: |
+            sum(mongodb_mongod_db_stats_data_size) / 1073741824
+
+        # Tickets available (read/write) - indicates concurrency pressure
+        - record: mongodb:wiredtiger:tickets_available
+          expr: |
+            mongodb_mongod_wiredtiger_concurrent_transactions_available_tickets
