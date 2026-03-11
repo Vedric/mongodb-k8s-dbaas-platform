@@ -1,0 +1,11 @@
+---
+# kind-config.yaml
+# Kind cluster configuration for the MongoDB DBaaS platform.
+# 3 worker nodes to support anti-affinity rules for replica set members.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+  - role: worker
+  - role: worker
+  - role: worker
