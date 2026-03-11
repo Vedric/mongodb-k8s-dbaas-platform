@@ -1,0 +1,103 @@
+---
+name: Tests
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+
+permissions:
+  contents: read
+
+env:
+  KIND_CLUSTER_NAME: mongodb-dbaas-ci
+  MONGODB_NAMESPACE: mongodb
+  OPERATOR_NAMESPACE: mongodb-operator
+
+jobs:
+  integration-tests:
+    name: Integration Tests (kind)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install kind
+        uses: helm/kind-action@v1
+        with:
+          install_only: true
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.14.0
+
+      - name: Install bats
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq bats jq
+
+      - name: Create kind cluster
+        run: |
+          kind create cluster \
+            --name "${KIND_CLUSTER_NAME}" \
+            --config scripts/kind-config.yaml \
+            --wait 120s
+
+      - name: Deploy Percona Operator
+        run: |
+          kubectl apply -k operator/
+          helm repo add percona https://percona.github.io/percona-helm-charts/
+          helm repo update percona
+          helm upgrade --install psmdb-operator-crds percona/psmdb-operator-crds \
+            --namespace "${OPERATOR_NAMESPACE}"
+          helm upgrade --install psmdb-operator percona/psmdb-operator \
+            --namespace "${OPERATOR_NAMESPACE}" \
+            -f operator/percona-server-mongodb-operator/values.yaml \
+            --wait --timeout 120s
+
+      - name: Deploy MongoDB replica set
+        run: |
+          kubectl create namespace "${MONGODB_NAMESPACE}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+          kubectl apply -k clusters/replicaset/
+
+      - name: Wait for replica set to be ready
+        run: |
+          echo "Waiting for replica set pods..."
+          kubectl wait --for=condition=ready pod \
+            -l "app.kubernetes.io/instance=mongodb-rs" \
+            -n "${MONGODB_NAMESPACE}" \
+            --timeout=300s
+          echo "Replica set pods are ready."
+          kubectl get pods -n "${MONGODB_NAMESPACE}"
+
+      - name: Run bats test suite
+        run: |
+          export MONGODB_NAMESPACE="${MONGODB_NAMESPACE}"
+          export MONGODB_CLUSTER="mongodb-rs"
+          export MONGODB_RS_NAME="rs0"
+          export MONGODB_RS_MEMBERS="3"
+          bats tests/bats/test_replicaset_health.bats
+
+      - name: Collect debug info on failure
+        if: failure()
+        run: |
+          echo "=== Pod status ==="
+          kubectl get pods -A
+          echo "=== Events ==="
+          kubectl get events -n "${MONGODB_NAMESPACE}" --sort-by='.lastTimestamp'
+          echo "=== Operator logs ==="
+          kubectl logs -n "${OPERATOR_NAMESPACE}" -l app.kubernetes.io/name=percona-server-mongodb-operator \
+            --tail=100 || true
+          echo "=== MongoDB pod logs ==="
+          for pod in $(kubectl get pods -n "${MONGODB_NAMESPACE}" -o name); do
+            echo "--- ${pod} ---"
+            kubectl logs -n "${MONGODB_NAMESPACE}" "${pod}" -c mongod --tail=50 || true
+          done
+
+      - name: Teardown kind cluster
+        if: always()
+        run: kind delete cluster --name "${KIND_CLUSTER_NAME}"
