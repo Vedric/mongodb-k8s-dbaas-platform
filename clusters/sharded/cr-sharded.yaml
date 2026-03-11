@@ -139,10 +139,12 @@ spec:
   # Backup configuration (managed separately in Phase 3)
   backup:
     enabled: false
+    image: percona/percona-backup-mongodb:2.4.1
 
   # PMM monitoring integration (managed separately in Phase 5)
   pmm:
     enabled: false
+    image: percona/pmm-client:2.41.2
 
   # Update strategy
   updateStrategy: SmartUpdate

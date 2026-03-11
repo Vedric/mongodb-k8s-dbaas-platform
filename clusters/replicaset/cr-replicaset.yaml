@@ -50,9 +50,11 @@ spec:
       # Non-voting members (none for standard 3-node RS)
       nonvoting:
         enabled: false
+        size: 0
       # Arbiter (disabled - using 3 full data-bearing members)
       arbiter:
         enabled: false
+        size: 0
       # MongoDB configuration (inline mongod config)
       configuration: |
         net:
@@ -68,10 +70,12 @@ spec:
   # Backup configuration (managed separately in Phase 3)
   backup:
     enabled: false
+    image: percona/percona-backup-mongodb:2.4.1
 
   # PMM monitoring integration (managed separately in Phase 5)
   pmm:
     enabled: false
+    image: percona/pmm-client:2.41.2
 
   # Update strategy
   updateStrategy: SmartUpdate
