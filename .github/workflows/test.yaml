@@ -19,7 +19,7 @@ jobs:
   integration-tests:
     name: Integration Tests (kind)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -80,19 +80,23 @@ jobs:
 
       - name: Wait for replica set to be ready
         run: |
-          echo "Waiting for operator to create pods..."
-          for i in $(seq 1 60); do
-            if kubectl get pods -n "${MONGODB_NAMESPACE}" -l "app.kubernetes.io/instance=mongodb-rs" 2>/dev/null | grep -q "mongodb-rs"; then
-              echo "Pods found after ${i}s"
+          echo "Waiting for all 3 replica set pods to exist..."
+          for i in $(seq 1 120); do
+            pod_count=$(kubectl get pods -n "${MONGODB_NAMESPACE}" \
+              -l "app.kubernetes.io/instance=mongodb-rs" \
+              --no-headers 2>/dev/null | wc -l)
+            if [ "${pod_count}" -ge 3 ]; then
+              echo "All 3 pods exist after $((i * 5))s"
               break
             fi
+            echo "  ${pod_count}/3 pods exist (attempt ${i})..."
             sleep 5
           done
-          echo "Waiting for pods to become ready..."
+          echo "Waiting for all pods to become ready..."
           kubectl wait --for=condition=ready pod \
             -l "app.kubernetes.io/instance=mongodb-rs" \
             -n "${MONGODB_NAMESPACE}" \
-            --timeout=300s
+            --timeout=600s
           echo "Replica set pods are ready."
           kubectl get pods -n "${MONGODB_NAMESPACE}"
 
