@@ -94,7 +94,15 @@ For local development with `kind`, the `rancher.io/local-path` provisioner is us
 - `WaitForFirstConsumer` means PVCs remain `Pending` until a pod is scheduled, which can initially confuse operators (mitigated by documentation)
 - Storage provisioner differences between `kind` (local-path) and production (cloud CSI) mean some behavior cannot be fully tested locally
 
+### 📝 Benchmark Results
+
+Storage benchmarks have been completed and validate the chosen StorageClass configuration. Full results with methodology, raw data, and t-shirt size recommendations are available in [fio-storage-results.md](../benchmarks/fio-storage-results.md).
+
+Key findings:
+- gp3 baseline (3,000 IOPS) meets requirements for S/M workloads
+- gp3 provisioned (10,000 IOPS) required for L workloads with sub-millisecond fsync
+- All journal fsync latency targets met across configurations
+
 ### 📝 Open items
 
-- fio benchmark results to be added after Phase 2 cluster deployment (see `docs/benchmarks/fio-storage-results.md`)
 - Cloud-specific provisioner parameters to be documented per target environment
