@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.0.1 - 2026-03-11
+
+### Security
+
+- Update `golang.org/x/crypto` v0.21.0 to v0.25.0
+- Update `golang.org/x/net` v0.22.0 to v0.27.0
+- Update `google.golang.org/protobuf` v1.32.0 to v1.33.0
+
+### Added
+
+- Dependabot configuration targeting `develop` branch for Go modules and GitHub Actions
+
+### Changed
+
+- CI Go version pinning updated from `1.22` to `stable`
+
 ## v1.0.0 - 2026-03-11
 
 ### Added
