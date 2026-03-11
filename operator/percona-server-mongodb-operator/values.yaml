@@ -18,9 +18,9 @@ resources:
     cpu: 100m
     memory: 128Mi
 
-# Watch cluster-wide or single namespace
-# Set to "" for cluster-wide, or a specific namespace
-watchNamespace: ""
+# Watch cluster-wide (creates ClusterRole and ClusterRoleBinding)
+# Set to true for multi-namespace deployments
+watchAllNamespaces: true
 
 # Enable RBAC creation
 rbac:

@@ -1,7 +1,7 @@
 ---
 name: Tests
 
-on:
+"on":
   pull_request:
     branches:
       - develop
@@ -19,10 +19,10 @@ jobs:
   integration-tests:
     name: Integration Tests (kind)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install kind
         uses: helm/kind-action@v1
@@ -52,27 +52,59 @@ jobs:
           helm repo add percona https://percona.github.io/percona-helm-charts/
           helm repo update percona
           helm upgrade --install psmdb-operator-crds percona/psmdb-operator-crds \
-            --namespace "${OPERATOR_NAMESPACE}"
+            --namespace "${OPERATOR_NAMESPACE}" \
+            --version 1.22.0
           helm upgrade --install psmdb-operator percona/psmdb-operator \
             --namespace "${OPERATOR_NAMESPACE}" \
             -f operator/percona-server-mongodb-operator/values.yaml \
+            --version 1.22.0 \
             --wait --timeout 120s
 
       - name: Deploy MongoDB replica set
         run: |
           kubectl create namespace "${MONGODB_NAMESPACE}" \
             --dry-run=client -o yaml | kubectl apply -f -
+          kubectl create secret generic mongodb-rs-secrets \
+            -n "${MONGODB_NAMESPACE}" \
+            --from-literal=MONGODB_DATABASE_ADMIN_USER=databaseAdmin \
+            --from-literal=MONGODB_DATABASE_ADMIN_PASSWORD=databaseAdmin123 \
+            --from-literal=MONGODB_CLUSTER_ADMIN_USER=clusterAdmin \
+            --from-literal=MONGODB_CLUSTER_ADMIN_PASSWORD=clusterAdmin123 \
+            --from-literal=MONGODB_USER_ADMIN_USER=userAdmin \
+            --from-literal=MONGODB_USER_ADMIN_PASSWORD=userAdmin123 \
+            --from-literal=MONGODB_CLUSTER_MONITOR_USER=clusterMonitor \
+            --from-literal=MONGODB_CLUSTER_MONITOR_PASSWORD=clusterMonitor123 \
+            --from-literal=MONGODB_BACKUP_USER=backup \
+            --from-literal=MONGODB_BACKUP_PASSWORD=backup123
           kubectl apply -k clusters/replicaset/
 
       - name: Wait for replica set to be ready
         run: |
-          echo "Waiting for replica set pods..."
+          echo "Waiting for all 3 replica set pods to exist..."
+          for i in $(seq 1 120); do
+            pod_count=$(kubectl get pods -n "${MONGODB_NAMESPACE}" \
+              -l "app.kubernetes.io/instance=mongodb-rs" \
+              --no-headers 2>/dev/null | wc -l)
+            if [ "${pod_count}" -ge 3 ]; then
+              echo "All 3 pods exist after $((i * 5))s"
+              break
+            fi
+            echo "  ${pod_count}/3 pods exist (attempt ${i})..."
+            sleep 5
+          done
+          echo "Waiting for all pods to become ready..."
           kubectl wait --for=condition=ready pod \
             -l "app.kubernetes.io/instance=mongodb-rs" \
             -n "${MONGODB_NAMESPACE}" \
-            --timeout=300s
+            --timeout=600s
           echo "Replica set pods are ready."
           kubectl get pods -n "${MONGODB_NAMESPACE}"
+          echo "Waiting for PSMDB cluster to initialize..."
+          kubectl wait --for=jsonpath='{.status.state}'=ready \
+            psmdb/mongodb-rs \
+            -n "${MONGODB_NAMESPACE}" \
+            --timeout=300s
+          echo "MongoDB replica set is fully initialized."
 
       - name: Run bats test suite
         run: |
@@ -87,11 +119,23 @@ jobs:
         run: |
           echo "=== Pod status ==="
           kubectl get pods -A
-          echo "=== Events ==="
-          kubectl get events -n "${MONGODB_NAMESPACE}" --sort-by='.lastTimestamp'
-          echo "=== Operator logs ==="
-          kubectl logs -n "${OPERATOR_NAMESPACE}" -l app.kubernetes.io/name=percona-server-mongodb-operator \
-            --tail=100 || true
+          echo "=== Events (all namespaces) ==="
+          kubectl get events -A --sort-by='.lastTimestamp' || true
+          echo "=== PSMDB CR describe ==="
+          kubectl describe psmdb -n "${MONGODB_NAMESPACE}" || true
+          echo "=== PSMDB CR status ==="
+          kubectl get psmdb -n "${MONGODB_NAMESPACE}" -o yaml || true
+          echo "=== StorageClass ==="
+          kubectl get storageclass || true
+          echo "=== Operator RBAC check ==="
+          kubectl auth can-i list perconaservermongodbs.psmdb.percona.com \
+            -n "${MONGODB_NAMESPACE}" \
+            --as=system:serviceaccount:"${OPERATOR_NAMESPACE}":psmdb-operator || true
+          kubectl auth can-i create statefulsets \
+            -n "${MONGODB_NAMESPACE}" \
+            --as=system:serviceaccount:"${OPERATOR_NAMESPACE}":psmdb-operator || true
+          echo "=== Operator logs (full) ==="
+          kubectl logs -n "${OPERATOR_NAMESPACE}" deploy/psmdb-operator || true
           echo "=== MongoDB pod logs ==="
           for pod in $(kubectl get pods -n "${MONGODB_NAMESPACE}" -o name); do
             echo "--- ${pod} ---"

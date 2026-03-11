@@ -50,32 +50,28 @@ spec:
       # Non-voting members (none for standard 3-node RS)
       nonvoting:
         enabled: false
+        size: 0
       # Arbiter (disabled - using 3 full data-bearing members)
       arbiter:
         enabled: false
-
-  # MongoDB configuration
-  mongod:
-    # WiredTiger cache size (default: 50% of memory limit - 1GB)
-    storage:
-      wiredTiger:
-        engineConfig:
-          cacheSizeRatio: 0.5
-    # Network configuration
-    net:
-      port: 27017
-    # Operation profiling (log slow queries > 100ms)
-    operationProfiling:
-      mode: slowOp
-      slowOpThresholdMs: 100
+        size: 0
+      # MongoDB configuration (inline mongod config)
+      configuration: |
+        net:
+          port: 27017
+        operationProfiling:
+          mode: slowOp
+          slowOpThresholdMs: 100
 
   # Backup configuration (managed separately in Phase 3)
   backup:
     enabled: false
+    image: percona/percona-backup-mongodb:2.4.1
 
   # PMM monitoring integration (managed separately in Phase 5)
   pmm:
     enabled: false
+    image: percona/pmm-client:2.41.2
 
   # Update strategy
   updateStrategy: SmartUpdate

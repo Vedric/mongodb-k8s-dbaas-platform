@@ -90,6 +90,13 @@ spec:
           resources:
             requests:
               storage: 20Gi
+      # MongoDB configuration (inline mongod config)
+      configuration: |
+        net:
+          port: 27017
+        operationProfiling:
+          mode: slowOp
+          slowOpThresholdMs: 100
 
     # Shard 1
     - name: shard1
@@ -113,26 +120,23 @@ spec:
           resources:
             requests:
               storage: 20Gi
-
-  # MongoDB configuration
-  mongod:
-    storage:
-      wiredTiger:
-        engineConfig:
-          cacheSizeRatio: 0.5
-    net:
-      port: 27017
-    operationProfiling:
-      mode: slowOp
-      slowOpThresholdMs: 100
+      # MongoDB configuration (inline mongod config)
+      configuration: |
+        net:
+          port: 27017
+        operationProfiling:
+          mode: slowOp
+          slowOpThresholdMs: 100
 
   # Backup configuration (managed separately in Phase 3)
   backup:
     enabled: false
+    image: percona/percona-backup-mongodb:2.4.1
 
   # PMM monitoring integration (managed separately in Phase 5)
   pmm:
     enabled: false
+    image: percona/pmm-client:2.41.2
 
   # Update strategy
   updateStrategy: SmartUpdate

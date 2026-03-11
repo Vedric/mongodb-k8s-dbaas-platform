@@ -7,9 +7,10 @@ namespace: mongodb-operator
 resources:
   - namespace.yaml
 
-commonLabels:
-  app.kubernetes.io/part-of: mongodb-dbaas-platform
-  app.kubernetes.io/managed-by: kustomize
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: mongodb-dbaas-platform
+      app.kubernetes.io/managed-by: kustomize
 
 # The Percona Operator is deployed via Helm (see Makefile deploy-operator target).
 # This kustomization manages the namespace and any additional resources
