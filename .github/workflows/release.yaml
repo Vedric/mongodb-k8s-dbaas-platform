@@ -97,6 +97,14 @@ jobs:
         run: |
           kubectl create namespace mongodb --dry-run=client -o yaml | kubectl apply -f -
           kubectl apply -k clusters/replicaset/
+          echo "Waiting for operator to create pods..."
+          for i in $(seq 1 60); do
+            if kubectl get pods -n mongodb -l "app.kubernetes.io/instance=mongodb-rs" 2>/dev/null | grep -q "mongodb-rs"; then
+              echo "Pods found after ${i}s"
+              break
+            fi
+            sleep 5
+          done
           echo "Waiting for replica set pods..."
           kubectl wait --for=condition=ready pod \
             -l app.kubernetes.io/instance=mongodb-rs \
