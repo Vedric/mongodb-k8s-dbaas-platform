@@ -106,7 +106,8 @@ record_pre_backup_state() {
 
 trigger_backup() {
   log "Step 3: Triggering manual backup..."
-  local backup_name="ci-backup-$(date +%Y%m%d-%H%M%S)"
+  local backup_name
+  backup_name="ci-backup-$(date +%Y%m%d-%H%M%S)"
 
   run kubectl apply -f - <<EOF
 apiVersion: psmdb.percona.com/v1

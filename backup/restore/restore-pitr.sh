@@ -116,7 +116,8 @@ check_pitr_available() {
 perform_pitr_restore() {
   log "Starting Point-in-Time Recovery to ${TARGET_TIME}..."
 
-  local restore_name="pitr-restore-$(date +%Y%m%d-%H%M%S)"
+  local restore_name
+  restore_name="pitr-restore-$(date +%Y%m%d-%H%M%S)"
 
   run kubectl apply -f - <<EOF
 apiVersion: psmdb.percona.com/v1

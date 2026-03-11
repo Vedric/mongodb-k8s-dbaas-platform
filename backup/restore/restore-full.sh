@@ -113,7 +113,8 @@ perform_restore() {
   log "Starting full restore from backup '${BACKUP_NAME}'..."
 
   # Create restore CR
-  local restore_name="restore-$(date +%Y%m%d-%H%M%S)"
+  local restore_name
+  restore_name="restore-$(date +%Y%m%d-%H%M%S)"
 
   run kubectl apply -f - <<EOF
 apiVersion: psmdb.percona.com/v1
