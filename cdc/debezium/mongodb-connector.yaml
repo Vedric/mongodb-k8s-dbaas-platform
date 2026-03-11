@@ -1,0 +1,156 @@
+---
+# Kafka Connect cluster with Debezium MongoDB connector plugin.
+# Deployed via Strimzi KafkaConnect CR with the Debezium connector
+# image built using the Strimzi plugin mechanism.
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaConnect
+metadata:
+  name: debezium-connect
+  namespace: kafka
+  labels:
+    app.kubernetes.io/name: debezium-connect
+    app.kubernetes.io/component: cdc
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: strimzi
+  annotations:
+    description: >-
+      Kafka Connect cluster with Debezium MongoDB connector for CDC.
+      Captures document changes from MongoDB and publishes them to Kafka topics.
+    strimzi.io/use-connector-resources: "true"
+spec:
+  version: 3.7.0
+  replicas: 1
+  bootstrapServers: mongodb-cdc-kafka-bootstrap:9092
+  config:
+    group.id: debezium-mongodb-connect
+    offset.storage.topic: debezium-connect-offsets
+    offset.storage.replication.factor: 3
+    config.storage.topic: debezium-connect-configs
+    config.storage.replication.factor: 3
+    status.storage.topic: debezium-connect-status
+    status.storage.replication.factor: 3
+    key.converter: org.apache.kafka.connect.json.JsonConverter
+    value.converter: org.apache.kafka.connect.json.JsonConverter
+    key.converter.schemas.enable: false
+    value.converter.schemas.enable: false
+    # Error handling
+    errors.tolerance: all
+    errors.deadletterqueue.topic.name: mongodb-cdc-dlq
+    errors.deadletterqueue.topic.replication.factor: 3
+    errors.deadletterqueue.context.headers.enable: true
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+  build:
+    output:
+      type: docker
+      image: localhost:5001/debezium-connect-mongodb:latest
+    plugins:
+      - name: debezium-mongodb
+        artifacts:
+          - type: tgz
+            url: https://repo1.maven.org/maven2/io/debezium/debezium-connector-mongodb/2.6.1.Final/debezium-connector-mongodb-2.6.1.Final-plugin.tar.gz
+  metricsConfig:
+    type: jmxPrometheusExporter
+    valueFrom:
+      configMapKeyRef:
+        name: connect-metrics
+        key: connect-metrics-config.yml
+---
+# Debezium MongoDB Source Connector configuration
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaConnector
+metadata:
+  name: mongodb-source-connector
+  namespace: kafka
+  labels:
+    app.kubernetes.io/name: mongodb-source-connector
+    app.kubernetes.io/component: cdc
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: strimzi
+    strimzi.io/cluster: debezium-connect
+  annotations:
+    description: >-
+      Debezium MongoDB source connector. Captures change events from
+      the MongoDB replica set and publishes them to Kafka topics.
+spec:
+  class: io.debezium.connector.mongodb.MongoDbConnector
+  tasksMax: 1
+  config:
+    # MongoDB connection
+    mongodb.connection.string: "mongodb://mongodb-rs-rs0.mongodb.svc.cluster.local:27017/?replicaSet=rs0"
+    mongodb.user: "${file:/opt/kafka/external-configuration/mongodb-credentials/username}"
+    mongodb.password: "${file:/opt/kafka/external-configuration/mongodb-credentials/password}"
+
+    # Connector identity
+    topic.prefix: mongodb
+
+    # Capture settings
+    capture.mode: change_streams_update_full_with_pre_image
+    snapshot.mode: initial
+
+    # Collection filtering
+    collection.include.list: ".*"
+    database.include.list: ".*"
+    database.exclude.list: "admin,local,config"
+
+    # Signal and notification
+    signal.data.collection: "admin.debezium_signal"
+    notification.enabled.channels: log
+
+    # Transforms - flatten nested MongoDB document structure
+    transforms: unwrap
+    transforms.unwrap.type: io.debezium.connector.mongodb.transforms.ExtractNewDocumentState
+    transforms.unwrap.drop.tombstones: false
+    transforms.unwrap.delete.handling.mode: rewrite
+    transforms.unwrap.add.fields: "op,source.ts_ms,source.db,source.collection"
+
+    # Heartbeat
+    heartbeat.interval.ms: 10000
+    heartbeat.topics.prefix: "__debezium-heartbeat"
+
+    # Error handling
+    errors.tolerance: all
+    errors.deadletterqueue.topic.name: mongodb-cdc-dlq
+    errors.deadletterqueue.topic.replication.factor: 3
+---
+# Kafka Connect metrics ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: connect-metrics
+  namespace: kafka
+  labels:
+    app.kubernetes.io/name: connect-metrics
+    app.kubernetes.io/component: cdc
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: strimzi
+data:
+  connect-metrics-config.yml: |
+    lowercaseOutputName: true
+    lowercaseOutputLabelNames: true
+    rules:
+      - pattern: "kafka.connect<type=connect-worker-metrics>([^=]+)=([^,]+)"
+        name: "kafka_connect_worker_$1"
+        type: GAUGE
+      - pattern: "kafka.connect<type=connector-metrics, connector=(.+)><>([a-z-]+)"
+        name: "kafka_connect_connector_$2"
+        type: GAUGE
+        labels:
+          connector: "$1"
+      - pattern: "kafka.connect<type=connector-task-metrics, connector=(.+), task=(.+)><>([a-z-]+)"
+        name: "kafka_connect_connector_task_$3"
+        type: GAUGE
+        labels:
+          connector: "$1"
+          task: "$2"
+      - pattern: "debezium.mongodb<type=connector-metrics, context=(.+), server=(.+)><>([a-z-]+)"
+        name: "debezium_mongodb_$3"
+        type: GAUGE
+        labels:
+          context: "$1"
+          server: "$2"
