@@ -1,0 +1,27 @@
+---
+# Example: Team Beta requests a Medium MongoDB instance for staging
+apiVersion: dbaas.platform.local/v1alpha1
+kind: MongoDBInstanceClaim
+metadata:
+  name: team-beta-staging-db
+  namespace: default
+  labels:
+    app.kubernetes.io/name: team-beta-staging-db
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: crossplane
+    team: beta
+    environment: staging
+spec:
+  parameters:
+    teamName: beta
+    environment: staging
+    size: M
+    version: "7.0"
+    backupEnabled: true
+    monitoringEnabled: true
+  compositionSelector:
+    matchLabels:
+      dbaas.platform.local/provider: percona
+  writeConnectionSecretToRef:
+    name: team-beta-staging-db-conn

@@ -1,0 +1,536 @@
+---
+# Crossplane Composition for MongoDBInstance
+# Maps the self-service XRD to Percona PSMDB CR + tenant isolation resources.
+#
+# T-shirt size mappings (defined in ADR-005):
+#   S: 500m/1 CPU, 1Gi/2Gi mem, 10Gi storage
+#   M: 1/2 CPU, 2Gi/4Gi mem, 20Gi storage
+#   L: 2/4 CPU, 4Gi/8Gi mem, 50Gi storage
+#
+# Reference: ADR-003, ADR-005
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: mongodbinstance-percona
+  labels:
+    app.kubernetes.io/name: mongodbinstance-composition
+    app.kubernetes.io/component: self-service
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: crossplane
+    dbaas.platform.local/provider: percona
+  annotations:
+    description: >-
+      Maps MongoDBInstance claims to Percona PSMDB CR, Namespace,
+      NetworkPolicy, ResourceQuota, and LimitRange resources.
+spec:
+  compositeTypeRef:
+    apiVersion: dbaas.platform.local/v1alpha1
+    kind: MongoDBInstance
+
+  writeConnectionSecretsToNamespace: crossplane-system
+
+  resources:
+    # ──────────────────────────────────────────────
+    # Resource 1: Tenant Namespace
+    # ──────────────────────────────────────────────
+    - name: tenant-namespace
+      base:
+        apiVersion: kubernetes.crossplane.io/v1alpha2
+        kind: Object
+        spec:
+          forProvider:
+            manifest:
+              apiVersion: v1
+              kind: Namespace
+              metadata:
+                name: placeholder
+                labels:
+                  app.kubernetes.io/part-of: mongodb-dbaas-platform
+                  app.kubernetes.io/managed-by: crossplane
+                  dbaas.platform.local/tenant: "true"
+      patches:
+        # Namespace name: mongodb-{teamName}-{environment}
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.parameters.teamName
+              - fromFieldPath: spec.parameters.environment
+            strategy: string
+            string:
+              fmt: "mongodb-%s-%s"
+          toFieldPath: spec.forProvider.manifest.metadata.name
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.teamName
+          toFieldPath: spec.forProvider.manifest.metadata.labels["dbaas.platform.local/team"]
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.environment
+          toFieldPath: spec.forProvider.manifest.metadata.labels["dbaas.platform.local/environment"]
+
+    # ──────────────────────────────────────────────
+    # Resource 2: NetworkPolicy - tenant isolation
+    # ──────────────────────────────────────────────
+    - name: network-policy
+      base:
+        apiVersion: kubernetes.crossplane.io/v1alpha2
+        kind: Object
+        spec:
+          forProvider:
+            manifest:
+              apiVersion: networking.k8s.io/v1
+              kind: NetworkPolicy
+              metadata:
+                name: tenant-isolation
+                labels:
+                  app.kubernetes.io/name: tenant-isolation
+                  app.kubernetes.io/component: network
+                  app.kubernetes.io/part-of: mongodb-dbaas-platform
+                  app.kubernetes.io/managed-by: crossplane
+              spec:
+                podSelector: {}
+                policyTypes:
+                  - Ingress
+                  - Egress
+                ingress:
+                  # Allow traffic within the same namespace
+                  - from:
+                      - podSelector: {}
+                  # Allow traffic from monitoring namespace (Prometheus scraping)
+                  - from:
+                      - namespaceSelector:
+                          matchLabels:
+                            kubernetes.io/metadata.name: monitoring
+                    ports:
+                      - protocol: TCP
+                        port: 9216  # mongodb-exporter
+                egress:
+                  # Allow DNS resolution
+                  - to:
+                      - namespaceSelector: {}
+                    ports:
+                      - protocol: UDP
+                        port: 53
+                      - protocol: TCP
+                        port: 53
+                  # Allow traffic within the same namespace
+                  - to:
+                      - podSelector: {}
+                  # Allow traffic to MongoDB operator namespace
+                  - to:
+                      - namespaceSelector:
+                          matchLabels:
+                            kubernetes.io/metadata.name: mongodb-operator
+      patches:
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.parameters.teamName
+              - fromFieldPath: spec.parameters.environment
+            strategy: string
+            string:
+              fmt: "mongodb-%s-%s"
+          toFieldPath: spec.forProvider.manifest.metadata.namespace
+
+    # ──────────────────────────────────────────────
+    # Resource 3: ResourceQuota
+    # ──────────────────────────────────────────────
+    - name: resource-quota-small
+      base:
+        apiVersion: kubernetes.crossplane.io/v1alpha2
+        kind: Object
+        spec:
+          forProvider:
+            manifest:
+              apiVersion: v1
+              kind: ResourceQuota
+              metadata:
+                name: tenant-quota
+                labels:
+                  app.kubernetes.io/name: tenant-quota
+                  app.kubernetes.io/component: governance
+                  app.kubernetes.io/part-of: mongodb-dbaas-platform
+                  app.kubernetes.io/managed-by: crossplane
+              spec:
+                hard:
+                  requests.cpu: "2"
+                  requests.memory: 4Gi
+                  limits.cpu: "4"
+                  limits.memory: 8Gi
+                  persistentvolumeclaims: "5"
+                  requests.storage: 40Gi
+                  pods: "10"
+      patches:
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.parameters.teamName
+              - fromFieldPath: spec.parameters.environment
+            strategy: string
+            string:
+              fmt: "mongodb-%s-%s"
+          toFieldPath: spec.forProvider.manifest.metadata.namespace
+        # Size-based quota: S -> 2/4Gi, M -> 4/8Gi, L -> 8/16Gi (2x instance profile)
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.size
+          toFieldPath: spec.forProvider.manifest.spec.hard["requests.cpu"]
+          transforms:
+            - type: map
+              map:
+                S: "2"
+                M: "4"
+                L: "8"
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.size
+          toFieldPath: spec.forProvider.manifest.spec.hard["requests.memory"]
+          transforms:
+            - type: map
+              map:
+                S: 4Gi
+                M: 8Gi
+                L: 16Gi
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.size
+          toFieldPath: spec.forProvider.manifest.spec.hard["limits.cpu"]
+          transforms:
+            - type: map
+              map:
+                S: "4"
+                M: "8"
+                L: "16"
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.size
+          toFieldPath: spec.forProvider.manifest.spec.hard["limits.memory"]
+          transforms:
+            - type: map
+              map:
+                S: 8Gi
+                M: 16Gi
+                L: 32Gi
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.size
+          toFieldPath: spec.forProvider.manifest.spec.hard["requests.storage"]
+          transforms:
+            - type: map
+              map:
+                S: 40Gi
+                M: 80Gi
+                L: 200Gi
+
+    # ──────────────────────────────────────────────
+    # Resource 4: LimitRange
+    # ──────────────────────────────────────────────
+    - name: limit-range
+      base:
+        apiVersion: kubernetes.crossplane.io/v1alpha2
+        kind: Object
+        spec:
+          forProvider:
+            manifest:
+              apiVersion: v1
+              kind: LimitRange
+              metadata:
+                name: tenant-limits
+                labels:
+                  app.kubernetes.io/name: tenant-limits
+                  app.kubernetes.io/component: governance
+                  app.kubernetes.io/part-of: mongodb-dbaas-platform
+                  app.kubernetes.io/managed-by: crossplane
+              spec:
+                limits:
+                  - type: Container
+                    default:
+                      cpu: "1"
+                      memory: 2Gi
+                    defaultRequest:
+                      cpu: 500m
+                      memory: 1Gi
+                    max:
+                      cpu: "4"
+                      memory: 8Gi
+      patches:
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.parameters.teamName
+              - fromFieldPath: spec.parameters.environment
+            strategy: string
+            string:
+              fmt: "mongodb-%s-%s"
+          toFieldPath: spec.forProvider.manifest.metadata.namespace
+        # Adjust default limits based on size
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.size
+          toFieldPath: spec.forProvider.manifest.spec.limits[0].default.cpu
+          transforms:
+            - type: map
+              map:
+                S: "1"
+                M: "2"
+                L: "4"
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.size
+          toFieldPath: spec.forProvider.manifest.spec.limits[0].default.memory
+          transforms:
+            - type: map
+              map:
+                S: 2Gi
+                M: 4Gi
+                L: 8Gi
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.size
+          toFieldPath: spec.forProvider.manifest.spec.limits[0].defaultRequest.cpu
+          transforms:
+            - type: map
+              map:
+                S: 500m
+                M: "1"
+                L: "2"
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.size
+          toFieldPath: spec.forProvider.manifest.spec.limits[0].defaultRequest.memory
+          transforms:
+            - type: map
+              map:
+                S: 1Gi
+                M: 2Gi
+                L: 4Gi
+
+    # ──────────────────────────────────────────────
+    # Resource 5: PerconaServerMongoDB CR
+    # ──────────────────────────────────────────────
+    - name: psmdb-cluster
+      base:
+        apiVersion: kubernetes.crossplane.io/v1alpha2
+        kind: Object
+        spec:
+          forProvider:
+            manifest:
+              apiVersion: psmdb.percona.com/v1
+              kind: PerconaServerMongoDB
+              metadata:
+                name: placeholder
+                labels:
+                  app.kubernetes.io/part-of: mongodb-dbaas-platform
+                  app.kubernetes.io/managed-by: crossplane
+              spec:
+                crVersion: "1.22.0"
+                image: percona/percona-server-mongodb:7.0.8-5
+                imagePullPolicy: IfNotPresent
+
+                tls:
+                  mode: requireTLS
+
+                replsets:
+                  - name: rs0
+                    size: 3
+                    affinity:
+                      antiAffinityTopologyKey: kubernetes.io/hostname
+                    podDisruptionBudget:
+                      maxUnavailable: 1
+                    resources:
+                      limits:
+                        cpu: "1"
+                        memory: 2Gi
+                      requests:
+                        cpu: 500m
+                        memory: 1Gi
+                    volumeSpec:
+                      persistentVolumeClaim:
+                        storageClassName: local-path
+                        accessModes:
+                          - ReadWriteOnce
+                        resources:
+                          requests:
+                            storage: 10Gi
+                    configuration: |
+                      operationProfiling:
+                        mode: slowOp
+                        slowOpThresholdMs: 100
+                      storage:
+                        wiredTiger:
+                          engineConfig:
+                            cacheSizeGB: 0.5
+
+                sharding:
+                  enabled: false
+
+      patches:
+        # Namespace
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.parameters.teamName
+              - fromFieldPath: spec.parameters.environment
+            strategy: string
+            string:
+              fmt: "mongodb-%s-%s"
+          toFieldPath: spec.forProvider.manifest.metadata.namespace
+        # CR name: {teamName}-{environment}-rs
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.parameters.teamName
+              - fromFieldPath: spec.parameters.environment
+            strategy: string
+            string:
+              fmt: "%s-%s-rs"
+          toFieldPath: spec.forProvider.manifest.metadata.name
+        # Team label
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.teamName
+          toFieldPath: spec.forProvider.manifest.metadata.labels["dbaas.platform.local/team"]
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.environment
+          toFieldPath: spec.forProvider.manifest.metadata.labels["dbaas.platform.local/environment"]
+
+        # MongoDB version
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.version
+          toFieldPath: spec.forProvider.manifest.spec.image
+          transforms:
+            - type: map
+              map:
+                "6.0": "percona/percona-server-mongodb:6.0.15-12"
+                "7.0": "percona/percona-server-mongodb:7.0.8-5"
+
+        # Size-based resource mapping - CPU requests
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.size
+          toFieldPath: spec.forProvider.manifest.spec.replsets[0].resources.requests.cpu
+          transforms:
+            - type: map
+              map:
+                S: 500m
+                M: "1"
+                L: "2"
+        # CPU limits
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.size
+          toFieldPath: spec.forProvider.manifest.spec.replsets[0].resources.limits.cpu
+          transforms:
+            - type: map
+              map:
+                S: "1"
+                M: "2"
+                L: "4"
+        # Memory requests
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.size
+          toFieldPath: spec.forProvider.manifest.spec.replsets[0].resources.requests.memory
+          transforms:
+            - type: map
+              map:
+                S: 1Gi
+                M: 2Gi
+                L: 4Gi
+        # Memory limits
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.size
+          toFieldPath: spec.forProvider.manifest.spec.replsets[0].resources.limits.memory
+          transforms:
+            - type: map
+              map:
+                S: 2Gi
+                M: 4Gi
+                L: 8Gi
+        # Storage
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.size
+          toFieldPath: spec.forProvider.manifest.spec.replsets[0].volumeSpec.persistentVolumeClaim.resources.requests.storage
+          transforms:
+            - type: map
+              map:
+                S: 10Gi
+                M: 20Gi
+                L: 50Gi
+        # WiredTiger cache size (50% of memory limit)
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.size
+          toFieldPath: spec.forProvider.manifest.spec.replsets[0].configuration
+          transforms:
+            - type: map
+              map:
+                S: |
+                  operationProfiling:
+                    mode: slowOp
+                    slowOpThresholdMs: 100
+                  storage:
+                    wiredTiger:
+                      engineConfig:
+                        cacheSizeGB: 0.5
+                M: |
+                  operationProfiling:
+                    mode: slowOp
+                    slowOpThresholdMs: 100
+                  storage:
+                    wiredTiger:
+                      engineConfig:
+                        cacheSizeGB: 1.0
+                L: |
+                  operationProfiling:
+                    mode: slowOp
+                    slowOpThresholdMs: 100
+                  storage:
+                    wiredTiger:
+                      engineConfig:
+                        cacheSizeGB: 2.0
+
+        # Anti-affinity: soft for dev, hard for staging/production
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.environment
+          toFieldPath: spec.forProvider.manifest.spec.replsets[0].affinity.antiAffinityTopologyKey
+          transforms:
+            - type: map
+              map:
+                dev: "none"
+                staging: kubernetes.io/hostname
+                production: kubernetes.io/hostname
+
+    # ──────────────────────────────────────────────
+    # Resource 6: SCRAM credentials Secret
+    # ──────────────────────────────────────────────
+    - name: scram-credentials
+      base:
+        apiVersion: kubernetes.crossplane.io/v1alpha2
+        kind: Object
+        spec:
+          forProvider:
+            manifest:
+              apiVersion: v1
+              kind: Secret
+              metadata:
+                name: placeholder-database-admin
+                labels:
+                  app.kubernetes.io/component: auth
+                  app.kubernetes.io/part-of: mongodb-dbaas-platform
+                  app.kubernetes.io/managed-by: crossplane
+              type: Opaque
+              stringData:
+                MONGODB_DATABASE_ADMIN_USER: databaseAdmin
+                MONGODB_DATABASE_ADMIN_PASSWORD: REPLACE_WITH_SECURE_PASSWORD
+                MONGODB_CLUSTER_ADMIN_USER: clusterAdmin
+                MONGODB_CLUSTER_ADMIN_PASSWORD: REPLACE_WITH_SECURE_PASSWORD
+                MONGODB_USER_ADMIN_USER: userAdmin
+                MONGODB_USER_ADMIN_PASSWORD: REPLACE_WITH_SECURE_PASSWORD
+                MONGODB_CLUSTER_MONITOR_USER: clusterMonitor
+                MONGODB_CLUSTER_MONITOR_PASSWORD: REPLACE_WITH_SECURE_PASSWORD
+                MONGODB_BACKUP_USER: backup
+                MONGODB_BACKUP_PASSWORD: REPLACE_WITH_SECURE_PASSWORD
+      patches:
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.parameters.teamName
+              - fromFieldPath: spec.parameters.environment
+            strategy: string
+            string:
+              fmt: "mongodb-%s-%s"
+          toFieldPath: spec.forProvider.manifest.metadata.namespace
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.parameters.teamName
+              - fromFieldPath: spec.parameters.environment
+            strategy: string
+            string:
+              fmt: "%s-%s-rs-secrets"
+          toFieldPath: spec.forProvider.manifest.metadata.name

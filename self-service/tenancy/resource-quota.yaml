@@ -1,0 +1,38 @@
+---
+# ResourceQuota template for tenant namespaces.
+# Enforces upper bounds on compute, storage, and object counts.
+# Values should be scaled based on the t-shirt size (see ADR-005):
+#   S: 2 CPU / 4Gi mem / 40Gi storage
+#   M: 4 CPU / 8Gi mem / 80Gi storage
+#   L: 8 CPU / 16Gi mem / 200Gi storage
+#
+# These represent 2x the instance profile to allow for headroom
+# during rolling updates and backup operations.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: tenant-quota
+  labels:
+    app.kubernetes.io/name: tenant-quota
+    app.kubernetes.io/component: governance
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: platform-team
+  annotations:
+    description: >-
+      Resource quota for tenant namespace. Limits total compute,
+      storage, and pod count to prevent resource exhaustion.
+spec:
+  hard:
+    # Compute resources (adjust per t-shirt size)
+    requests.cpu: "4"
+    requests.memory: 8Gi
+    limits.cpu: "8"
+    limits.memory: 16Gi
+    # Storage
+    persistentvolumeclaims: "5"
+    requests.storage: 80Gi
+    # Object count limits
+    pods: "10"
+    services: "5"
+    secrets: "20"
+    configmaps: "10"

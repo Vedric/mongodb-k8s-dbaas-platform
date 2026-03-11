@@ -1,0 +1,141 @@
+---
+# CompositeResourceDefinition (XRD) for MongoDBInstance
+# Defines the self-service API that product teams use to provision
+# MongoDB instances with t-shirt sizing (S/M/L).
+#
+# Reference: ADR-005 - Self-Service XRD Design
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: mongodbinstances.dbaas.platform.local
+  labels:
+    app.kubernetes.io/name: mongodbinstance-xrd
+    app.kubernetes.io/component: self-service
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: crossplane
+  annotations:
+    description: >-
+      Self-service MongoDB provisioning API for product teams.
+      Supports t-shirt sizing (S/M/L) with secure defaults.
+spec:
+  group: dbaas.platform.local
+  names:
+    kind: MongoDBInstance
+    plural: mongodbinstances
+    shortNames:
+      - mdbinst
+    categories:
+      - dbaas
+      - database
+
+  claimNames:
+    kind: MongoDBInstanceClaim
+    plural: mongodbinstanceclaims
+
+  connectionSecretKeys:
+    - connectionString
+    - username
+    - password
+    - host
+    - port
+
+  versions:
+    - name: v1alpha1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                parameters:
+                  type: object
+                  description: >-
+                    Configuration parameters for the MongoDB instance.
+                    Product teams only need to specify these fields.
+                  properties:
+                    teamName:
+                      type: string
+                      description: >-
+                        Name of the owning team. Used for namespace naming,
+                        RBAC bindings, and cost attribution.
+                      pattern: "^[a-z][a-z0-9-]{1,28}[a-z0-9]$"
+                      minLength: 3
+                      maxLength: 30
+
+                    environment:
+                      type: string
+                      description: >-
+                        Target environment. Controls anti-affinity strength
+                        and default backup/monitoring settings.
+                      enum:
+                        - dev
+                        - staging
+                        - production
+
+                    size:
+                      type: string
+                      description: >-
+                        T-shirt size that maps to predefined resource profiles.
+                        S: 500m/1Gi/10Gi, M: 1/2Gi/20Gi, L: 2/4Gi/50Gi.
+                      enum:
+                        - S
+                        - M
+                        - L
+
+                    version:
+                      type: string
+                      description: >-
+                        MongoDB server version. Defaults to 7.0 if not specified.
+                      enum:
+                        - "6.0"
+                        - "7.0"
+                      default: "7.0"
+
+                    backupEnabled:
+                      type: boolean
+                      description: >-
+                        Enable automated PBM backups (daily snapshot + continuous oplog).
+                        Defaults to true. Set to false for dev/test instances.
+                      default: true
+
+                    monitoringEnabled:
+                      type: boolean
+                      description: >-
+                        Enable Prometheus mongodb-exporter sidecar for metrics collection.
+                        Defaults to true.
+                      default: true
+
+                  required:
+                    - teamName
+                    - environment
+                    - size
+
+              required:
+                - parameters
+
+            status:
+              type: object
+              properties:
+                clusterEndpoint:
+                  type: string
+                  description: Internal cluster DNS endpoint for the MongoDB instance.
+                namespace:
+                  type: string
+                  description: Kubernetes namespace where the instance is deployed.
+                ready:
+                  type: boolean
+                  description: Whether the MongoDB instance is fully ready.
+                size:
+                  type: string
+                  description: Applied t-shirt size profile.
+                phase:
+                  type: string
+                  description: Current provisioning phase.
+                  enum:
+                    - Provisioning
+                    - Ready
+                    - Error
+                    - Deleting

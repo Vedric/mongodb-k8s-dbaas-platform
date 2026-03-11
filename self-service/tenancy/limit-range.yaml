@@ -1,0 +1,40 @@
+---
+# LimitRange for tenant namespaces.
+# Sets default resource requests/limits for containers that do not
+# specify their own, and enforces maximum resource caps per container.
+#
+# Default values match the Medium (M) t-shirt size profile.
+# Adjust per namespace based on the provisioned size (see ADR-005).
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: tenant-limits
+  labels:
+    app.kubernetes.io/name: tenant-limits
+    app.kubernetes.io/component: governance
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: platform-team
+  annotations:
+    description: >-
+      Default and maximum resource limits for containers in tenant
+      namespaces. Prevents pods from consuming unbounded resources.
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: "1"
+        memory: 2Gi
+      defaultRequest:
+        cpu: 500m
+        memory: 1Gi
+      max:
+        cpu: "4"
+        memory: 8Gi
+      min:
+        cpu: 100m
+        memory: 128Mi
+    - type: PersistentVolumeClaim
+      max:
+        storage: 100Gi
+      min:
+        storage: 1Gi

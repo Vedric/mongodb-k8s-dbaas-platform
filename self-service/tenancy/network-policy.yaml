@@ -1,0 +1,75 @@
+---
+# NetworkPolicy for tenant namespace isolation.
+# Applied to every tenant namespace to enforce:
+#   - Intra-namespace communication (MongoDB RS members)
+#   - Monitoring namespace access (Prometheus scraping on port 9216)
+#   - DNS resolution (kube-dns/CoreDNS)
+#   - Operator namespace access (Percona operator reconciliation)
+#   - All other ingress/egress denied by default
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: tenant-isolation
+  labels:
+    app.kubernetes.io/name: tenant-isolation
+    app.kubernetes.io/component: network
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: platform-team
+  annotations:
+    description: >-
+      Default deny with selective allow for MongoDB replica set
+      communication, monitoring, DNS, and operator access.
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    # Allow all traffic within the same namespace (RS member communication)
+    - from:
+        - podSelector: {}
+
+    # Allow Prometheus scraping from the monitoring namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9216
+
+    # Allow operator webhook/reconciliation from operator namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: mongodb-operator
+
+  egress:
+    # Allow DNS resolution (UDP and TCP)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # Allow traffic within the same namespace
+    - to:
+        - podSelector: {}
+
+    # Allow traffic to the MongoDB operator namespace
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: mongodb-operator
+
+    # Allow traffic to backup storage (MinIO/S3)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: mongodb
+      ports:
+        - protocol: TCP
+          port: 9000
