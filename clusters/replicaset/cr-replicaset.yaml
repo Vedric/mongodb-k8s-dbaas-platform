@@ -1,0 +1,81 @@
+---
+apiVersion: psmdb.percona.com/v1
+kind: PerconaServerMongoDB
+metadata:
+  name: mongodb-rs
+  namespace: mongodb
+  labels:
+    app.kubernetes.io/name: mongodb-rs
+    app.kubernetes.io/component: replicaset
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: percona-operator
+  annotations:
+    description: "3-node MongoDB replica set for production workloads"
+spec:
+  crVersion: 1.22.0
+  image: percona/percona-server-mongodb:7.0.14-8
+  imagePullPolicy: IfNotPresent
+
+  # MongoDB users managed via Kubernetes Secrets
+  secrets:
+    users: mongodb-rs-secrets
+
+  # Replica set configuration
+  replsets:
+    - name: rs0
+      size: 3
+      # Pod affinity: spread across nodes for HA
+      affinity:
+        antiAffinityTopologyKey: kubernetes.io/hostname
+      # Pod disruption budget: at most 1 pod unavailable
+      podDisruptionBudget:
+        maxUnavailable: 1
+      # Resource limits and requests
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "500m"
+          memory: 1Gi
+      # Persistent storage configuration
+      volumeSpec:
+        persistentVolumeClaim:
+          storageClassName: mongodb-replicaset-storage
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 20Gi
+      # Non-voting members (none for standard 3-node RS)
+      nonvoting:
+        enabled: false
+      # Arbiter (disabled - using 3 full data-bearing members)
+      arbiter:
+        enabled: false
+
+  # MongoDB configuration
+  mongod:
+    # WiredTiger cache size (default: 50% of memory limit - 1GB)
+    storage:
+      wiredTiger:
+        engineConfig:
+          cacheSizeRatio: 0.5
+    # Network configuration
+    net:
+      port: 27017
+    # Operation profiling (log slow queries > 100ms)
+    operationProfiling:
+      mode: slowOp
+      slowOpThresholdMs: 100
+
+  # Backup configuration (managed separately in Phase 3)
+  backup:
+    enabled: false
+
+  # PMM monitoring integration (managed separately in Phase 5)
+  pmm:
+    enabled: false
+
+  # Update strategy
+  updateStrategy: SmartUpdate
