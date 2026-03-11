@@ -9,24 +9,34 @@ CLUSTER_NAME="${MONGODB_CLUSTER:-mongodb-rs}"
 RS_NAME="${MONGODB_RS_NAME:-rs0}"
 EXPECTED_MEMBERS="${MONGODB_RS_MEMBERS:-3}"
 
-# Helper: get MongoDB connection string from the cluster secret
-get_connection_uri() {
-  local secret_name="${CLUSTER_NAME}-${RS_NAME}-users"
-  kubectl get secret "${secret_name}" -n "${NAMESPACE}" \
-    -o jsonpath='{.data.MONGODB_DATABASE_ADMIN_URI}' 2>/dev/null | base64 -d
+# Helper: get databaseAdmin credentials from the users secret
+get_admin_credentials() {
+  local secret_name="${CLUSTER_NAME}-secrets"
+  local user pass
+  user=$(kubectl get secret "${secret_name}" -n "${NAMESPACE}" \
+    -o jsonpath='{.data.MONGODB_DATABASE_ADMIN_USER}' 2>/dev/null | base64 -d)
+  pass=$(kubectl get secret "${secret_name}" -n "${NAMESPACE}" \
+    -o jsonpath='{.data.MONGODB_DATABASE_ADMIN_PASSWORD}' 2>/dev/null | base64 -d)
+  if [ -n "${user}" ] && [ -n "${pass}" ]; then
+    echo "${user}:${pass}"
+  fi
 }
 
 # Helper: run mongosh command against the replica set
 run_mongosh() {
-  local uri
-  uri=$(get_connection_uri)
-  if [ -z "${uri}" ]; then
-    # Fallback: connect via pod exec
+  local creds
+  creds=$(get_admin_credentials)
+  if [ -n "${creds}" ]; then
+    local user="${creds%%:*}"
+    local pass="${creds#*:}"
+    kubectl exec "${CLUSTER_NAME}-${RS_NAME}-0" -n "${NAMESPACE}" -c mongod -- \
+      mongosh --quiet \
+      -u "${user}" -p "${pass}" --authenticationDatabase admin \
+      --eval "$1" 2>/dev/null
+  else
+    # Fallback: connect without explicit credentials
     kubectl exec "${CLUSTER_NAME}-${RS_NAME}-0" -n "${NAMESPACE}" -c mongod -- \
       mongosh --quiet --eval "$1" 2>/dev/null
-  else
-    kubectl exec "${CLUSTER_NAME}-${RS_NAME}-0" -n "${NAMESPACE}" -c mongod -- \
-      mongosh "${uri}" --quiet --eval "$1" 2>/dev/null
   fi
 }
 
