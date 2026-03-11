@@ -1,0 +1,27 @@
+---
+# Example: Team Gamma requests a Large MongoDB instance for production
+apiVersion: dbaas.platform.local/v1alpha1
+kind: MongoDBInstanceClaim
+metadata:
+  name: team-gamma-prod-db
+  namespace: default
+  labels:
+    app.kubernetes.io/name: team-gamma-prod-db
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: crossplane
+    team: gamma
+    environment: production
+spec:
+  parameters:
+    teamName: gamma
+    environment: production
+    size: L
+    version: "7.0"
+    backupEnabled: true
+    monitoringEnabled: true
+  compositionSelector:
+    matchLabels:
+      dbaas.platform.local/provider: percona
+  writeConnectionSecretToRef:
+    name: team-gamma-prod-db-conn
