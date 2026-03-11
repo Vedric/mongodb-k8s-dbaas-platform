@@ -1,0 +1,140 @@
+---
+# MongoDB audit log configuration for the Percona Operator.
+# Applied as a ConfigMap and referenced in the PerconaServerMongoDB CR.
+#
+# Audit logging captures:
+#   - Authentication events (login success/failure)
+#   - Authorization events (privilege checks)
+#   - CRUD operations on sensitive collections
+#   - DDL operations (create/drop database, collection, index)
+#   - Role and user management operations
+#
+# Reference: https://www.mongodb.com/docs/manual/core/auditing/
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongodb-audit-config
+  namespace: mongodb
+  labels:
+    app.kubernetes.io/name: mongodb-audit-config
+    app.kubernetes.io/component: audit
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: kustomize
+  annotations:
+    description: >-
+      Audit log filter configuration for MongoDB. Captures authentication,
+      authorization, DDL, and user management events for compliance.
+data:
+  mongod.conf: |
+    auditLog:
+      destination: file
+      format: JSON
+      path: /var/log/mongodb/audit.json
+      filter: >-
+        {
+          "$or": [
+            {
+              "atype": {
+                "$in": [
+                  "authenticate",
+                  "authCheck",
+                  "createUser",
+                  "dropUser",
+                  "updateUser",
+                  "grantRolesToUser",
+                  "revokeRolesFromUser",
+                  "createRole",
+                  "dropRole",
+                  "updateRole",
+                  "createDatabase",
+                  "dropDatabase",
+                  "createCollection",
+                  "dropCollection",
+                  "createIndex",
+                  "dropIndex",
+                  "shutdown",
+                  "replSetReconfig",
+                  "applicationMessage"
+                ]
+              }
+            },
+            {
+              "atype": "authCheck",
+              "param.command": {
+                "$in": [
+                  "delete",
+                  "update",
+                  "drop",
+                  "dropDatabase",
+                  "killCursors",
+                  "killOp"
+                ]
+              }
+            }
+          ]
+        }
+---
+# Audit config for sharded cluster namespace
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongodb-audit-config
+  namespace: mongodb-sharded
+  labels:
+    app.kubernetes.io/name: mongodb-audit-config
+    app.kubernetes.io/component: audit
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: kustomize
+  annotations:
+    description: >-
+      Audit log filter configuration for MongoDB sharded cluster.
+data:
+  mongod.conf: |
+    auditLog:
+      destination: file
+      format: JSON
+      path: /var/log/mongodb/audit.json
+      filter: >-
+        {
+          "$or": [
+            {
+              "atype": {
+                "$in": [
+                  "authenticate",
+                  "authCheck",
+                  "createUser",
+                  "dropUser",
+                  "updateUser",
+                  "grantRolesToUser",
+                  "revokeRolesFromUser",
+                  "createRole",
+                  "dropRole",
+                  "updateRole",
+                  "createDatabase",
+                  "dropDatabase",
+                  "createCollection",
+                  "dropCollection",
+                  "createIndex",
+                  "dropIndex",
+                  "shutdown",
+                  "replSetReconfig",
+                  "applicationMessage"
+                ]
+              }
+            },
+            {
+              "atype": "authCheck",
+              "param.command": {
+                "$in": [
+                  "delete",
+                  "update",
+                  "drop",
+                  "dropDatabase",
+                  "killCursors",
+                  "killOp"
+                ]
+              }
+            }
+          ]
+        }

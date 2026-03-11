@@ -1,0 +1,73 @@
+---
+# MongoDB user credentials managed as Kubernetes Secrets.
+# The Percona Operator reads these secrets to configure SCRAM-SHA-256
+# authentication for the MongoDB cluster.
+#
+# IMPORTANT: This file defines the Secret structure with placeholder values.
+# Actual passwords MUST be injected at deployment time via:
+#   - kubectl create secret (imperatively)
+#   - External Secrets Operator
+#   - Vault Agent Injector
+#   - Sealed Secrets
+#
+# Never store real credentials in this file or in version control.
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongodb-rs-secrets
+  namespace: mongodb
+  labels:
+    app.kubernetes.io/name: mongodb-rs-secrets
+    app.kubernetes.io/component: auth
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: kustomize
+  annotations:
+    description: >-
+      SCRAM-SHA-256 credentials for the MongoDB replica set.
+      Passwords are base64-encoded placeholders - replace before deployment.
+type: Opaque
+stringData:
+  # Database admin user (full cluster management)
+  MONGODB_DATABASE_ADMIN_USER: "databaseAdmin"
+  MONGODB_DATABASE_ADMIN_PASSWORD: "REPLACE_WITH_SECURE_PASSWORD"
+  # Cluster admin user (replica set operations)
+  MONGODB_CLUSTER_ADMIN_USER: "clusterAdmin"
+  MONGODB_CLUSTER_ADMIN_PASSWORD: "REPLACE_WITH_SECURE_PASSWORD"
+  # User admin (user/role management)
+  MONGODB_USER_ADMIN_USER: "userAdmin"
+  MONGODB_USER_ADMIN_PASSWORD: "REPLACE_WITH_SECURE_PASSWORD"
+  # Cluster monitor user (monitoring read-only)
+  MONGODB_CLUSTER_MONITOR_USER: "clusterMonitor"
+  MONGODB_CLUSTER_MONITOR_PASSWORD: "REPLACE_WITH_SECURE_PASSWORD"
+  # Backup user (PBM operations)
+  MONGODB_BACKUP_USER: "backup"
+  MONGODB_BACKUP_PASSWORD: "REPLACE_WITH_SECURE_PASSWORD"
+---
+# Sharded cluster credentials
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongodb-sharded-secrets
+  namespace: mongodb-sharded
+  labels:
+    app.kubernetes.io/name: mongodb-sharded-secrets
+    app.kubernetes.io/component: auth
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: kustomize
+  annotations:
+    description: >-
+      SCRAM-SHA-256 credentials for the MongoDB sharded cluster.
+      Passwords are base64-encoded placeholders - replace before deployment.
+type: Opaque
+stringData:
+  MONGODB_DATABASE_ADMIN_USER: "databaseAdmin"
+  MONGODB_DATABASE_ADMIN_PASSWORD: "REPLACE_WITH_SECURE_PASSWORD"
+  MONGODB_CLUSTER_ADMIN_USER: "clusterAdmin"
+  MONGODB_CLUSTER_ADMIN_PASSWORD: "REPLACE_WITH_SECURE_PASSWORD"
+  MONGODB_USER_ADMIN_USER: "userAdmin"
+  MONGODB_USER_ADMIN_PASSWORD: "REPLACE_WITH_SECURE_PASSWORD"
+  MONGODB_CLUSTER_MONITOR_USER: "clusterMonitor"
+  MONGODB_CLUSTER_MONITOR_PASSWORD: "REPLACE_WITH_SECURE_PASSWORD"
+  MONGODB_BACKUP_USER: "backup"
+  MONGODB_BACKUP_PASSWORD: "REPLACE_WITH_SECURE_PASSWORD"
