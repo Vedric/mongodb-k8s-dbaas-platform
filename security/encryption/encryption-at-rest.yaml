@@ -1,0 +1,104 @@
+---
+# MongoDB Encryption at Rest Configuration
+#
+# WiredTiger encryption protects data files, journal files, and indexes
+# at the storage engine level. Even if an attacker gains access to the
+# underlying storage (PVs), the data remains encrypted.
+#
+# The Percona Operator supports two key management approaches:
+#   1. Local key file (for development/testing)
+#   2. KMIP integration (for production with HashiCorp Vault or Thales)
+#
+# This configuration uses a Kubernetes Secret to store the encryption key.
+# In production, replace with Vault KMIP or Transit secrets engine.
+
+# Encryption key stored as a Kubernetes Secret
+# IMPORTANT: This is a placeholder - generate a real key before deployment:
+#   openssl rand -base64 32 | kubectl create secret generic mongodb-encryption-key \
+#     --from-literal=encryption-key=$(openssl rand -base64 32) \
+#     -n mongodb --dry-run=client -o yaml | kubectl apply -f -
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongodb-encryption-key
+  namespace: mongodb
+  labels:
+    app.kubernetes.io/name: mongodb-encryption-key
+    app.kubernetes.io/component: encryption
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: kustomize
+  annotations:
+    description: >-
+      WiredTiger encryption key for MongoDB data-at-rest encryption.
+      MUST be replaced with a securely generated key before deployment.
+      Consider using Vault Transit or KMIP for production key management.
+type: Opaque
+stringData:
+  encryption-key: "REPLACE_WITH_BASE64_ENCODED_32BYTE_KEY"
+---
+# Encryption key for sharded cluster
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongodb-encryption-key
+  namespace: mongodb-sharded
+  labels:
+    app.kubernetes.io/name: mongodb-encryption-key
+    app.kubernetes.io/component: encryption
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: kustomize
+  annotations:
+    description: >-
+      WiredTiger encryption key for MongoDB sharded cluster data-at-rest encryption.
+type: Opaque
+stringData:
+  encryption-key: "REPLACE_WITH_BASE64_ENCODED_32BYTE_KEY"
+---
+# ConfigMap documenting the Percona CR configuration for encryption at rest.
+# Add this section to the PerconaServerMongoDB CR spec:
+#
+# spec:
+#   mongod:
+#     security:
+#       enableEncryption: true
+#       encryptionKeySecret: mongodb-encryption-key
+#       encryptionCipherMode: AES256-CBC
+#
+# For KMIP integration (production):
+#
+# spec:
+#   mongod:
+#     security:
+#       enableEncryption: true
+#       vault:
+#         serverName: vault.vault.svc.cluster.local
+#         port: 8200
+#         tokenSecret: vault-token
+#         secret: secret/data/mongodb/encryption-key
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: encryption-at-rest-reference
+  namespace: mongodb
+  labels:
+    app.kubernetes.io/name: encryption-at-rest-reference
+    app.kubernetes.io/component: encryption
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: kustomize
+  annotations:
+    description: >-
+      Reference ConfigMap documenting encryption at rest configuration
+      options for the Percona Operator CR. Not consumed by the operator
+      directly - serves as operational documentation.
+data:
+  encryption-mode: "AES256-CBC"
+  key-management: "kubernetes-secret"
+  production-recommendation: "Migrate to Vault KMIP or Transit for key lifecycle management"
+  key-rotation-procedure: |
+    1. Generate a new encryption key
+    2. Create a new Kubernetes Secret with the new key
+    3. Update the Percona CR to reference the new secret
+    4. The operator will perform a rolling restart of all members
+    5. Verify all members are healthy and data is accessible
+    6. Delete the old encryption key secret
