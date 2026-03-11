@@ -1,0 +1,286 @@
+---
+# PrometheusRule for critical MongoDB alerts.
+# These alerts cover availability, performance, backup, and capacity scenarios
+# that require immediate attention from the platform engineering team.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: mongodb-critical-alerts
+  namespace: mongodb
+  labels:
+    app.kubernetes.io/name: mongodb-critical-alerts
+    app.kubernetes.io/component: alerting
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: platform-team
+    release: prometheus
+  annotations:
+    description: >-
+      Critical alerting rules for MongoDB. Covers primary availability,
+      replication health, resource exhaustion, backup failures, and
+      storage capacity warnings.
+spec:
+  groups:
+    # ──────────────────────────────────────────────
+    # Availability alerts
+    # ──────────────────────────────────────────────
+    - name: mongodb.availability
+      rules:
+        - alert: MongoDBPrimaryNotFound
+          expr: |
+            count(mongodb_mongod_replset_member_state{state="PRIMARY"}) == 0
+          for: 1m
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: "No MongoDB primary found in replica set"
+            description: >-
+              No PRIMARY member detected for the past 1 minute.
+              This indicates an election failure or total cluster outage.
+              See runbook-failover.md for recovery procedures.
+            runbook_url: "docs/runbook-failover.md"
+
+        - alert: MongoDBMemberDown
+          expr: |
+            mongodb_mongod_replset_member_health == 0
+          for: 1m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "MongoDB replica set member is unhealthy"
+            description: >-
+              Replica set member {{ $labels.name }} has health=0.
+              The member may be unreachable or in an error state.
+
+        - alert: MongoDBTooFewMembers
+          expr: |
+            count(mongodb_mongod_replset_member_health == 1) < 2
+          for: 2m
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: "Fewer than 2 healthy replica set members"
+            description: >-
+              Only {{ $value }} healthy member(s) detected. The replica set
+              has lost majority and cannot elect a primary. Immediate
+              action required.
+            runbook_url: "docs/runbook-failover.md"
+
+    # ──────────────────────────────────────────────
+    # Replication alerts
+    # ──────────────────────────────────────────────
+    - name: mongodb.replication
+      rules:
+        - alert: MongoDBHighReplicationLag
+          expr: |
+            mongodb:replication_lag:seconds > 10
+          for: 5m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "MongoDB replication lag exceeds 10 seconds"
+            description: >-
+              Secondary {{ $labels.instance }} has {{ $value }}s of
+              replication lag. This may indicate resource contention,
+              network issues, or an oversized write workload.
+
+        - alert: MongoDBCriticalReplicationLag
+          expr: |
+            mongodb:replication_lag:seconds > 60
+          for: 2m
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: "MongoDB replication lag exceeds 60 seconds"
+            description: >-
+              Secondary {{ $labels.instance }} has {{ $value }}s of
+              replication lag. Risk of falling out of the oplog window.
+              Consider scaling resources or investigating write load.
+            runbook_url: "docs/runbook-scaling.md"
+
+    # ──────────────────────────────────────────────
+    # Resource alerts
+    # ──────────────────────────────────────────────
+    - name: mongodb.resources
+      rules:
+        - alert: MongoDBHighCPUUsage
+          expr: |
+            rate(container_cpu_usage_seconds_total{
+              container="mongod",
+              namespace=~"mongodb.*"
+            }[5m]) / on(pod, namespace) kube_pod_container_resource_limits{
+              container="mongod",
+              resource="cpu"
+            } > 0.8
+          for: 10m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "MongoDB pod CPU usage exceeds 80%"
+            description: >-
+              Pod {{ $labels.pod }} in {{ $labels.namespace }} is using
+              {{ $value | humanizePercentage }} of its CPU limit.
+              Consider vertical scaling.
+            runbook_url: "docs/runbook-scaling.md"
+
+        - alert: MongoDBHighMemoryUsage
+          expr: |
+            container_memory_working_set_bytes{
+              container="mongod",
+              namespace=~"mongodb.*"
+            } / on(pod, namespace) kube_pod_container_resource_limits{
+              container="mongod",
+              resource="memory"
+            } > 0.85
+          for: 10m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "MongoDB pod memory usage exceeds 85%"
+            description: >-
+              Pod {{ $labels.pod }} in {{ $labels.namespace }} is using
+              {{ $value | humanizePercentage }} of its memory limit.
+              Risk of OOMKill. Consider vertical scaling.
+            runbook_url: "docs/runbook-scaling.md"
+
+        - alert: MongoDBConnectionsNearLimit
+          expr: |
+            mongodb:connections:utilization_percent > 80
+          for: 5m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "MongoDB connection utilization exceeds 80%"
+            description: >-
+              Instance {{ $labels.instance }} is at {{ $value }}%
+              connection utilization. Applications may start getting
+              connection errors.
+
+    # ──────────────────────────────────────────────
+    # Storage alerts
+    # ──────────────────────────────────────────────
+    - name: mongodb.storage
+      rules:
+        - alert: MongoDBStorageNearFull
+          expr: |
+            (kubelet_volume_stats_used_bytes{
+              namespace=~"mongodb.*",
+              persistentvolumeclaim=~"mongod-data-.*"
+            } / kubelet_volume_stats_capacity_bytes{
+              namespace=~"mongodb.*",
+              persistentvolumeclaim=~"mongod-data-.*"
+            }) > 0.8
+          for: 5m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "MongoDB PVC storage usage exceeds 80%"
+            description: >-
+              PVC {{ $labels.persistentvolumeclaim }} in
+              {{ $labels.namespace }} is {{ $value | humanizePercentage }}
+              full. Plan storage expansion.
+            runbook_url: "docs/runbook-scaling.md"
+
+        - alert: MongoDBStorageCritical
+          expr: |
+            (kubelet_volume_stats_used_bytes{
+              namespace=~"mongodb.*",
+              persistentvolumeclaim=~"mongod-data-.*"
+            } / kubelet_volume_stats_capacity_bytes{
+              namespace=~"mongodb.*",
+              persistentvolumeclaim=~"mongod-data-.*"
+            }) > 0.9
+          for: 2m
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: "MongoDB PVC storage usage exceeds 90%"
+            description: >-
+              PVC {{ $labels.persistentvolumeclaim }} is critically full
+              at {{ $value | humanizePercentage }}. Immediate storage
+              expansion required to prevent write failures.
+            runbook_url: "docs/runbook-scaling.md"
+
+    # ──────────────────────────────────────────────
+    # WiredTiger alerts
+    # ──────────────────────────────────────────────
+    - name: mongodb.wiredtiger
+      rules:
+        - alert: MongoDBWiredTigerCachePressure
+          expr: |
+            mongodb:wiredtiger:dirty_cache_percent > 20
+          for: 10m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "WiredTiger dirty cache exceeds 20%"
+            description: >-
+              Instance {{ $labels.instance }} has {{ $value }}% dirty
+              cache. This indicates write pressure exceeding checkpoint
+              throughput. Consider increasing cache size or reducing
+              write load.
+
+        - alert: MongoDBWiredTigerTicketsExhausted
+          expr: |
+            mongodb:wiredtiger:tickets_available < 10
+          for: 5m
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: "WiredTiger read/write tickets nearly exhausted"
+            description: >-
+              Only {{ $value }} WiredTiger tickets available on
+              {{ $labels.instance }}. Operations may queue, causing
+              latency spikes. Investigate long-running queries or
+              consider scaling.
+
+    # ──────────────────────────────────────────────
+    # Backup alerts
+    # ──────────────────────────────────────────────
+    - name: mongodb.backup
+      rules:
+        - alert: MongoDBBackupFailed
+          expr: |
+            kube_custom_resource_state{
+              group="psmdb.percona.com",
+              kind="PerconaServerMongoDBBackup"
+            } == 0
+          for: 5m
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: "MongoDB backup has failed"
+            description: >-
+              A backup resource is in a failed state. Check PBM logs
+              and MinIO connectivity. RPO target (15 minutes) may be
+              at risk.
+            runbook_url: "docs/runbook-backup-restore.md"
+
+        - alert: MongoDBNoRecentBackup
+          expr: |
+            time() - max(kube_custom_resource_state{
+              group="psmdb.percona.com",
+              kind="PerconaServerMongoDBBackup"
+            }) > 86400
+          for: 1h
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "No successful MongoDB backup in the last 24 hours"
+            description: >-
+              The last successful backup is older than 24 hours.
+              Verify backup schedule is active and PBM agent is healthy.
+            runbook_url: "docs/runbook-backup-restore.md"
