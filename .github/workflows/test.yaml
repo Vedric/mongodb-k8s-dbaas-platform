@@ -99,6 +99,12 @@ jobs:
             --timeout=600s
           echo "Replica set pods are ready."
           kubectl get pods -n "${MONGODB_NAMESPACE}"
+          echo "Waiting for PSMDB cluster to initialize..."
+          kubectl wait --for=jsonpath='{.status.state}'=ready \
+            psmdb/mongodb-rs \
+            -n "${MONGODB_NAMESPACE}" \
+            --timeout=300s
+          echo "MongoDB replica set is fully initialized."
 
       - name: Run bats test suite
         run: |
