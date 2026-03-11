@@ -2,7 +2,9 @@
 
 [![Lint](https://github.com/Vedric/mongodb-k8s-dbaas-platform/actions/workflows/lint.yaml/badge.svg)](https://github.com/Vedric/mongodb-k8s-dbaas-platform/actions/workflows/lint.yaml)
 [![Tests](https://github.com/Vedric/mongodb-k8s-dbaas-platform/actions/workflows/test.yaml/badge.svg)](https://github.com/Vedric/mongodb-k8s-dbaas-platform/actions/workflows/test.yaml)
+[![Release](https://github.com/Vedric/mongodb-k8s-dbaas-platform/actions/workflows/release.yaml/badge.svg)](https://github.com/Vedric/mongodb-k8s-dbaas-platform/actions/workflows/release.yaml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/github/v/tag/Vedric/mongodb-k8s-dbaas-platform?label=version&sort=semver)](https://github.com/Vedric/mongodb-k8s-dbaas-platform/releases)
 
 Enterprise-grade, self-service Database-as-a-Service (DBaaS) platform for MongoDB on Kubernetes. Provides production-ready stateful workload management including HA replica sets, sharded clusters, automated backups with PITR, full observability, CDC pipelines, multi-tenancy, and chaos-tested disaster recovery.
 
@@ -157,17 +159,26 @@ mongodb-k8s-dbaas-platform/
 Product teams provision MongoDB instances via a simple Crossplane claim:
 
 ```yaml
-apiVersion: dbaas.platform.io/v1alpha1
-kind: MongoDBInstance
+apiVersion: dbaas.platform.local/v1alpha1
+kind: MongoDBInstanceClaim
 metadata:
-  name: team-alpha-db
-  namespace: team-alpha
+  name: team-alpha-orders-db
+  namespace: default
 spec:
-  size: M              # S (2 CPU, 4Gi RAM, 20Gi disk)
-                        # M (4 CPU, 8Gi RAM, 50Gi disk)
-                        # L (8 CPU, 16Gi RAM, 100Gi disk)
-  version: "7.0"
-  backupEnabled: true
+  parameters:
+    teamName: alpha
+    environment: staging
+    size: M              # S (500m/1Gi/10Gi)
+                          # M (1/2Gi/20Gi)
+                          # L (2/4Gi/50Gi)
+    version: "7.0"
+    backupEnabled: true
+    monitoringEnabled: true
+  compositionSelector:
+    matchLabels:
+      dbaas.platform.local/provider: percona
+  writeConnectionSecretToRef:
+    name: team-alpha-orders-db-conn
 ```
 
 The platform automatically provisions:
