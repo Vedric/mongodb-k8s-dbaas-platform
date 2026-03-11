@@ -1,0 +1,99 @@
+---
+# TLS certificate for MongoDB replica set members (intra-cluster communication)
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: mongodb-rs-tls
+  namespace: mongodb
+  labels:
+    app.kubernetes.io/name: mongodb-rs-tls
+    app.kubernetes.io/component: tls
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: cert-manager
+  annotations:
+    description: >-
+      TLS certificate for MongoDB replica set members. Used for
+      intra-cluster encryption (member-to-member) and client connections.
+spec:
+  secretName: mongodb-rs-tls-secret
+  duration: 8760h  # 1 year
+  renewBefore: 720h  # 30 days before expiry
+  isCA: false
+  privateKey:
+    algorithm: RSA
+    encoding: PKCS8
+    size: 2048
+  usages:
+    - server auth
+    - client auth
+  dnsNames:
+    # Replica set member hostnames
+    - "mongodb-rs-rs0-0.mongodb-rs-rs0.mongodb.svc.cluster.local"
+    - "mongodb-rs-rs0-1.mongodb-rs-rs0.mongodb.svc.cluster.local"
+    - "mongodb-rs-rs0-2.mongodb-rs-rs0.mongodb.svc.cluster.local"
+    # Service DNS names
+    - "mongodb-rs-rs0.mongodb.svc.cluster.local"
+    - "mongodb-rs.mongodb.svc.cluster.local"
+    # Wildcard for dynamic member discovery
+    - "*.mongodb-rs-rs0.mongodb.svc.cluster.local"
+    - "*.mongodb.svc.cluster.local"
+    # Short names for internal access
+    - "mongodb-rs-rs0"
+    - "mongodb-rs"
+    - "localhost"
+  ipAddresses:
+    - "127.0.0.1"
+  issuerRef:
+    name: mongodb-tls-issuer
+    kind: Issuer
+    group: cert-manager.io
+---
+# TLS certificate for MongoDB sharded cluster
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: mongodb-sharded-tls
+  namespace: mongodb-sharded
+  labels:
+    app.kubernetes.io/name: mongodb-sharded-tls
+    app.kubernetes.io/component: tls
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: cert-manager
+  annotations:
+    description: >-
+      TLS certificate for MongoDB sharded cluster components:
+      mongos routers, config servers, and shard replica sets.
+spec:
+  secretName: mongodb-sharded-tls-secret
+  duration: 8760h
+  renewBefore: 720h
+  isCA: false
+  privateKey:
+    algorithm: RSA
+    encoding: PKCS8
+    size: 2048
+  usages:
+    - server auth
+    - client auth
+  dnsNames:
+    # Mongos
+    - "*.mongodb-sharded-mongos.mongodb-sharded.svc.cluster.local"
+    - "mongodb-sharded-mongos.mongodb-sharded.svc.cluster.local"
+    # Config servers
+    - "*.mongodb-sharded-cfg.mongodb-sharded.svc.cluster.local"
+    - "mongodb-sharded-cfg.mongodb-sharded.svc.cluster.local"
+    # Shard 0
+    - "*.mongodb-sharded-shard0.mongodb-sharded.svc.cluster.local"
+    - "mongodb-sharded-shard0.mongodb-sharded.svc.cluster.local"
+    # Shard 1
+    - "*.mongodb-sharded-shard1.mongodb-sharded.svc.cluster.local"
+    - "mongodb-sharded-shard1.mongodb-sharded.svc.cluster.local"
+    # Cluster-level DNS
+    - "*.mongodb-sharded.svc.cluster.local"
+    - "localhost"
+  ipAddresses:
+    - "127.0.0.1"
+  issuerRef:
+    name: mongodb-tls-issuer
+    kind: Issuer
+    group: cert-manager.io
