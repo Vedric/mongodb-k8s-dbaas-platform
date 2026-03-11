@@ -1,0 +1,138 @@
+---
+apiVersion: psmdb.percona.com/v1
+kind: PerconaServerMongoDB
+metadata:
+  name: mongodb-sharded
+  namespace: mongodb-sharded
+  labels:
+    app.kubernetes.io/name: mongodb-sharded
+    app.kubernetes.io/component: sharded-cluster
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: percona-operator
+  annotations:
+    description: >-
+      Sharded MongoDB cluster with 2 shards, 3 config servers,
+      and 3 mongos routers for horizontal scaling workloads.
+spec:
+  crVersion: 1.22.0
+  image: percona/percona-server-mongodb:7.0.14-8
+  imagePullPolicy: IfNotPresent
+
+  # MongoDB users managed via Kubernetes Secrets
+  secrets:
+    users: mongodb-sharded-secrets
+
+  # Sharding configuration
+  sharding:
+    enabled: true
+
+    # Config server replica set
+    configsvrReplSet:
+      size: 3
+      affinity:
+        antiAffinityTopologyKey: kubernetes.io/hostname
+      podDisruptionBudget:
+        maxUnavailable: 1
+      resources:
+        limits:
+          cpu: "1"
+          memory: 2Gi
+        requests:
+          cpu: "250m"
+          memory: 512Mi
+      volumeSpec:
+        persistentVolumeClaim:
+          storageClassName: mongodb-sharded-storage
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 5Gi
+
+    # Mongos router configuration
+    mongos:
+      size: 3
+      affinity:
+        antiAffinityTopologyKey: kubernetes.io/hostname
+      podDisruptionBudget:
+        maxUnavailable: 1
+      resources:
+        limits:
+          cpu: "1"
+          memory: 2Gi
+        requests:
+          cpu: "250m"
+          memory: 512Mi
+      expose:
+        exposeType: ClusterIP
+
+  # Shard replica sets
+  replsets:
+    # Shard 0
+    - name: shard0
+      size: 3
+      affinity:
+        antiAffinityTopologyKey: kubernetes.io/hostname
+      podDisruptionBudget:
+        maxUnavailable: 1
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "500m"
+          memory: 1Gi
+      volumeSpec:
+        persistentVolumeClaim:
+          storageClassName: mongodb-sharded-storage
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 20Gi
+
+    # Shard 1
+    - name: shard1
+      size: 3
+      affinity:
+        antiAffinityTopologyKey: kubernetes.io/hostname
+      podDisruptionBudget:
+        maxUnavailable: 1
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "500m"
+          memory: 1Gi
+      volumeSpec:
+        persistentVolumeClaim:
+          storageClassName: mongodb-sharded-storage
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 20Gi
+
+  # MongoDB configuration
+  mongod:
+    storage:
+      wiredTiger:
+        engineConfig:
+          cacheSizeRatio: 0.5
+    net:
+      port: 27017
+    operationProfiling:
+      mode: slowOp
+      slowOpThresholdMs: 100
+
+  # Backup configuration (managed separately in Phase 3)
+  backup:
+    enabled: false
+
+  # PMM monitoring integration (managed separately in Phase 5)
+  pmm:
+    enabled: false
+
+  # Update strategy
+  updateStrategy: SmartUpdate

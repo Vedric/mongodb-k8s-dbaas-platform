@@ -87,7 +87,14 @@ deploy-replicaset: ## Deploy 3-node replica set
 
 .PHONY: deploy-sharded
 deploy-sharded: ## Deploy sharded cluster
-	@echo "TODO: implement in Phase 2"
+	@echo "Deploying sharded MongoDB cluster..."
+	@kubectl create namespace mongodb-sharded --dry-run=client -o yaml | kubectl apply -f -
+	@kubectl apply -k clusters/sharded/
+	@echo "Waiting for sharded cluster to become ready..."
+	@kubectl wait --for=condition=ready pod -l app.kubernetes.io/component=mongos \
+		-n mongodb-sharded --timeout=300s 2>/dev/null || \
+		echo "Timeout waiting for mongos pods (may still be initializing)."
+	@echo "Sharded cluster deployment initiated."
 
 .PHONY: deploy-self-service
 deploy-self-service: ## Install Crossplane + XRDs + Compositions
