@@ -1,0 +1,167 @@
+---
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    name: Validate release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate tag format
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          if ! echo "${TAG}" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "ERROR: Tag '${TAG}' does not follow semver format (vX.Y.Z)"
+            exit 1
+          fi
+          echo "TAG=${TAG}" >> "${GITHUB_ENV}"
+          echo "Valid tag: ${TAG}"
+
+      - name: Verify CHANGELOG.md contains release entry
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          if ! grep -q "## \[${TAG}\]" CHANGELOG.md 2>/dev/null; then
+            if ! grep -q "## ${TAG}" CHANGELOG.md 2>/dev/null; then
+              echo "WARNING: No CHANGELOG.md entry found for ${TAG}"
+            fi
+          fi
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install yamllint
+        run: pip install yamllint
+
+      - name: Run yamllint
+        run: yamllint -c .yamllint.yaml .
+
+      - name: Run shellcheck
+        uses: ludeeus/action-shellcheck@2.0.0
+        with:
+          severity: warning
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  test:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: mongodb-dbaas
+          config: scripts/kind-config.yaml
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Deploy Percona Operator
+        run: |
+          kubectl apply -k operator/
+          helm repo add percona https://percona.github.io/percona-helm-charts/
+          helm repo update percona
+          helm upgrade --install psmdb-operator-crds percona/psmdb-operator-crds \
+            --namespace mongodb-operator
+          helm upgrade --install psmdb-operator percona/psmdb-operator \
+            --namespace mongodb-operator \
+            -f operator/percona-server-mongodb-operator/values.yaml \
+            --wait --timeout 120s
+
+      - name: Deploy MongoDB replica set
+        run: |
+          kubectl create namespace mongodb --dry-run=client -o yaml | kubectl apply -f -
+          kubectl apply -k clusters/replicaset/
+          echo "Waiting for replica set pods..."
+          kubectl wait --for=condition=ready pod \
+            -l app.kubernetes.io/instance=mongodb-rs \
+            -n mongodb --timeout=300s || true
+
+      - name: Install bats
+        run: |
+          sudo apt-get update && sudo apt-get install -y bats
+
+      - name: Run bats tests
+        run: bats tests/bats/test_replicaset_health.bats
+
+      - name: Debug on failure
+        if: failure()
+        run: |
+          echo "=== Pod status ==="
+          kubectl get pods -A
+          echo "=== Events ==="
+          kubectl get events -n mongodb --sort-by='.lastTimestamp' | tail -30
+          echo "=== Operator logs ==="
+          kubectl logs -n mongodb-operator \
+            -l app.kubernetes.io/name=percona-server-mongodb-operator \
+            --tail=50 || true
+
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract tag
+        run: echo "TAG=${GITHUB_REF#refs/tags/}" >> "${GITHUB_ENV}"
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          # Extract changelog section for this version
+          TAG="${GITHUB_REF#refs/tags/}"
+          NOTES=""
+          if [ -f CHANGELOG.md ]; then
+            NOTES=$(awk "/^## .*${TAG}/,/^## /" CHANGELOG.md | head -n -1 | tail -n +2)
+          fi
+
+          if [ -z "${NOTES}" ]; then
+            # Fall back to commit log since last tag
+            PREV_TAG=$(git tag --sort=-v:refname | head -2 | tail -1)
+            if [ -n "${PREV_TAG}" ]; then
+              NOTES=$(git log "${PREV_TAG}..HEAD" --pretty=format:"- %s" --no-merges)
+            else
+              NOTES="Initial release"
+            fi
+          fi
+
+          echo "notes<<EOF" >> "${GITHUB_OUTPUT}"
+          echo "${NOTES}" >> "${GITHUB_OUTPUT}"
+          echo "EOF" >> "${GITHUB_OUTPUT}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "${{ env.TAG }}"
+          body: ${{ steps.release_notes.outputs.notes }}
+          draft: false
+          prerelease: ${{ contains(env.TAG, '-rc') || contains(env.TAG, '-beta') || contains(env.TAG, '-alpha') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
