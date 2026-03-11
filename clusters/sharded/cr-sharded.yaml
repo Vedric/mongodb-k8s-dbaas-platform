@@ -97,10 +97,6 @@ spec:
         operationProfiling:
           mode: slowOp
           slowOpThresholdMs: 100
-        storage:
-          wiredTiger:
-            engineConfig:
-              cacheSizeRatio: 0.5
 
     # Shard 1
     - name: shard1
@@ -131,10 +127,6 @@ spec:
         operationProfiling:
           mode: slowOp
           slowOpThresholdMs: 100
-        storage:
-          wiredTiger:
-            engineConfig:
-              cacheSizeRatio: 0.5
 
   # Backup configuration (managed separately in Phase 3)
   backup:
