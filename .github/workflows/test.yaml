@@ -58,6 +58,7 @@ jobs:
             --namespace "${OPERATOR_NAMESPACE}" \
             -f operator/percona-server-mongodb-operator/values.yaml \
             --version 1.22.0 \
+            --set logLevel=DEBUG \
             --wait --timeout 120s
 
       - name: Deploy MongoDB replica set
@@ -109,13 +110,23 @@ jobs:
         run: |
           echo "=== Pod status ==="
           kubectl get pods -A
-          echo "=== Events ==="
-          kubectl get events -n "${MONGODB_NAMESPACE}" --sort-by='.lastTimestamp'
+          echo "=== Events (all namespaces) ==="
+          kubectl get events -A --sort-by='.lastTimestamp' || true
+          echo "=== PSMDB CR describe ==="
+          kubectl describe psmdb -n "${MONGODB_NAMESPACE}" || true
           echo "=== PSMDB CR status ==="
           kubectl get psmdb -n "${MONGODB_NAMESPACE}" -o yaml || true
-          echo "=== Operator logs ==="
-          kubectl logs -n "${OPERATOR_NAMESPACE}" deploy/psmdb-operator \
-            --tail=100 || true
+          echo "=== StorageClass ==="
+          kubectl get storageclass || true
+          echo "=== Operator RBAC check ==="
+          kubectl auth can-i list perconaservermongodbs.psmdb.percona.com \
+            -n "${MONGODB_NAMESPACE}" \
+            --as=system:serviceaccount:"${OPERATOR_NAMESPACE}":psmdb-operator || true
+          kubectl auth can-i create statefulsets \
+            -n "${MONGODB_NAMESPACE}" \
+            --as=system:serviceaccount:"${OPERATOR_NAMESPACE}":psmdb-operator || true
+          echo "=== Operator logs (full) ==="
+          kubectl logs -n "${OPERATOR_NAMESPACE}" deploy/psmdb-operator || true
           echo "=== MongoDB pod logs ==="
           for pod in $(kubectl get pods -n "${MONGODB_NAMESPACE}" -o name); do
             echo "--- ${pod} ---"
