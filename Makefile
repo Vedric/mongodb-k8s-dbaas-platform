@@ -8,6 +8,9 @@ SHELL := /usr/bin/env bash
 # ──────────────────────────────────────────────
 KIND_CLUSTER_NAME ?= mongodb-dbaas
 KUBECONFIG ?= $(HOME)/.kube/config
+OPERATOR_NAMESPACE ?= mongodb-operator
+HELM_REPO_NAME ?= percona
+HELM_REPO_URL ?= https://percona.github.io/percona-helm-charts/
 
 # ──────────────────────────────────────────────
 # Help
@@ -59,15 +62,39 @@ teardown: ## Destroy kind cluster and clean up
 # ──────────────────────────────────────────────
 .PHONY: deploy-operator
 deploy-operator: ## Install Percona Operator for MongoDB
-	@echo "TODO: implement in Phase 2"
+	@echo "Deploying Percona Operator for MongoDB..."
+	@kubectl apply -k operator/
+	@helm repo add $(HELM_REPO_NAME) $(HELM_REPO_URL) 2>/dev/null || true
+	@helm repo update $(HELM_REPO_NAME)
+	@helm upgrade --install psmdb-operator-crds $(HELM_REPO_NAME)/psmdb-operator-crds \
+		--namespace $(OPERATOR_NAMESPACE)
+	@helm upgrade --install psmdb-operator $(HELM_REPO_NAME)/psmdb-operator \
+		--namespace $(OPERATOR_NAMESPACE) \
+		-f operator/percona-server-mongodb-operator/values.yaml \
+		--wait --timeout 120s
+	@echo "Percona Operator deployed successfully."
 
 .PHONY: deploy-replicaset
 deploy-replicaset: ## Deploy 3-node replica set
-	@echo "TODO: implement in Phase 2"
+	@echo "Deploying 3-node MongoDB replica set..."
+	@kubectl create namespace mongodb --dry-run=client -o yaml | kubectl apply -f -
+	@kubectl apply -k clusters/replicaset/
+	@echo "Waiting for replica set to become ready..."
+	@kubectl wait --for=condition=ready pod -l app.kubernetes.io/component=mongod \
+		-n mongodb --timeout=300s 2>/dev/null || \
+		echo "Timeout waiting for pods (may still be initializing)."
+	@echo "Replica set deployment initiated."
 
 .PHONY: deploy-sharded
 deploy-sharded: ## Deploy sharded cluster
-	@echo "TODO: implement in Phase 2"
+	@echo "Deploying sharded MongoDB cluster..."
+	@kubectl create namespace mongodb-sharded --dry-run=client -o yaml | kubectl apply -f -
+	@kubectl apply -k clusters/sharded/
+	@echo "Waiting for sharded cluster to become ready..."
+	@kubectl wait --for=condition=ready pod -l app.kubernetes.io/component=mongos \
+		-n mongodb-sharded --timeout=300s 2>/dev/null || \
+		echo "Timeout waiting for mongos pods (may still be initializing)."
+	@echo "Sharded cluster deployment initiated."
 
 .PHONY: deploy-self-service
 deploy-self-service: ## Install Crossplane + XRDs + Compositions
