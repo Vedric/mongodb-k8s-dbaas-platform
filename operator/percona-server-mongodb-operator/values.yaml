@@ -1,0 +1,54 @@
+---
+# Percona Server for MongoDB Operator - Helm Values
+# Chart: percona/psmdb-operator
+# Version: 1.22.0
+#
+# Repository: https://percona.github.io/percona-helm-charts/
+# Docs: https://docs.percona.com/percona-operator-for-mongodb/
+
+# Operator replica count (1 is sufficient for most deployments)
+replicaCount: 1
+
+# Operator container resources
+resources:
+  limits:
+    cpu: 250m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Watch cluster-wide or single namespace
+# Set to "" for cluster-wide, or a specific namespace
+watchNamespace: ""
+
+# Enable RBAC creation
+rbac:
+  create: true
+
+# Service account
+serviceAccount:
+  create: true
+
+# Operator log level (INFO, DEBUG, ERROR)
+logLevel: INFO
+
+# Disable telemetry
+disableTelemetry: true
+
+# Pod scheduling
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+
+# Container security context
+containerSecurityContext:
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
