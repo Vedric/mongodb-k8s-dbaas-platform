@@ -53,21 +53,17 @@ spec:
       # Arbiter (disabled - using 3 full data-bearing members)
       arbiter:
         enabled: false
-
-  # MongoDB configuration
-  mongod:
-    # WiredTiger cache size (default: 50% of memory limit - 1GB)
-    storage:
-      wiredTiger:
-        engineConfig:
-          cacheSizeRatio: 0.5
-    # Network configuration
-    net:
-      port: 27017
-    # Operation profiling (log slow queries > 100ms)
-    operationProfiling:
-      mode: slowOp
-      slowOpThresholdMs: 100
+      # MongoDB configuration (inline mongod config)
+      configuration: |
+        net:
+          port: 27017
+        operationProfiling:
+          mode: slowOp
+          slowOpThresholdMs: 100
+        storage:
+          wiredTiger:
+            engineConfig:
+              cacheSizeRatio: 0.5
 
   # Backup configuration (managed separately in Phase 3)
   backup:

@@ -90,6 +90,17 @@ spec:
           resources:
             requests:
               storage: 20Gi
+      # MongoDB configuration (inline mongod config)
+      configuration: |
+        net:
+          port: 27017
+        operationProfiling:
+          mode: slowOp
+          slowOpThresholdMs: 100
+        storage:
+          wiredTiger:
+            engineConfig:
+              cacheSizeRatio: 0.5
 
     # Shard 1
     - name: shard1
@@ -113,18 +124,17 @@ spec:
           resources:
             requests:
               storage: 20Gi
-
-  # MongoDB configuration
-  mongod:
-    storage:
-      wiredTiger:
-        engineConfig:
-          cacheSizeRatio: 0.5
-    net:
-      port: 27017
-    operationProfiling:
-      mode: slowOp
-      slowOpThresholdMs: 100
+      # MongoDB configuration (inline mongod config)
+      configuration: |
+        net:
+          port: 27017
+        operationProfiling:
+          mode: slowOp
+          slowOpThresholdMs: 100
+        storage:
+          wiredTiger:
+            engineConfig:
+              cacheSizeRatio: 0.5
 
   # Backup configuration (managed separately in Phase 3)
   backup:

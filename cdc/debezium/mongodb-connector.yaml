@@ -53,6 +53,7 @@ spec:
       - name: debezium-mongodb
         artifacts:
           - type: tgz
+            # yamllint disable-line rule:line-length
             url: https://repo1.maven.org/maven2/io/debezium/debezium-connector-mongodb/2.6.1.Final/debezium-connector-mongodb-2.6.1.Final-plugin.tar.gz
   metricsConfig:
     type: jmxPrometheusExporter
