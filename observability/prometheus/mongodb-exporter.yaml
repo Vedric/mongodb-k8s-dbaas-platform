@@ -1,0 +1,60 @@
+---
+# MongoDB Exporter configuration for Percona Server for MongoDB Operator.
+# The Percona Operator natively supports the mongodb-exporter sidecar.
+# This ConfigMap documents the exporter settings referenced in the PSMDB CR.
+#
+# The actual exporter is enabled via the PSMDB CR spec.pmm section or
+# spec.replsets[].sidecars when using standalone exporter deployments.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongodb-exporter-config
+  namespace: mongodb
+  labels:
+    app.kubernetes.io/name: mongodb-exporter
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: platform-team
+  annotations:
+    description: >-
+      Configuration reference for the mongodb-exporter sidecar.
+      The Percona Operator automatically deploys the exporter when
+      monitoring is enabled in the PSMDB CR.
+data:
+  # Exporter configuration reference
+  # These settings are applied via the PSMDB CR, not directly via this ConfigMap.
+  exporter-notes: |
+    MongoDB Exporter Settings:
+    - Image: percona/mongodb_exporter:0.40.0
+    - Port: 9216 (metrics endpoint)
+    - Collectors enabled:
+      - diagnosticdata (serverStatus, replSetGetStatus)
+      - replicasetstatus (RS member state, lag)
+      - dbstats (per-database statistics)
+      - collstats (collection-level stats for top collections)
+      - indexstats (index usage statistics)
+      - topmetrics (operation counters per collection)
+    - Scrape interval: 30s (configured in ServiceMonitor)
+    - TLS: uses same certificates as MongoDB for secure scraping
+
+  # PSMDB CR snippet for enabling the exporter
+  psmdb-cr-snippet: |
+    spec:
+      replsets:
+        - name: rs0
+          sidecars:
+            - image: percona/mongodb_exporter:0.40.0
+              name: mongodb-exporter
+              args:
+                - "--mongodb.uri=mongodb://localhost:27017"
+                - "--compatible-mode"
+                - "--collector.diagnosticdata"
+                - "--collector.replicasetstatus"
+                - "--collector.dbstats"
+                - "--collector.collstats"
+                - "--collector.indexstats"
+                - "--collector.topmetrics"
+                - "--web.listen-address=:9216"
+              ports:
+                - containerPort: 9216
+                  name: metrics

@@ -98,15 +98,42 @@ deploy-sharded: ## Deploy sharded cluster
 
 .PHONY: deploy-self-service
 deploy-self-service: ## Install Crossplane + XRDs + Compositions
-	@echo "TODO: implement in Phase 4"
+	@echo "Deploying Crossplane self-service layer..."
+	@kubectl apply -f self-service/crossplane/xrd.yaml
+	@echo "Waiting for XRD to be established..."
+	@sleep 5
+	@kubectl apply -f self-service/crossplane/composition.yaml
+	@echo "Self-service layer deployed (XRD + Composition)."
+	@echo "Submit claims from self-service/crossplane/examples/ to provision instances."
 
 .PHONY: deploy-observability
 deploy-observability: ## Deploy Prometheus + Grafana + Loki + Fluent Bit
-	@echo "TODO: implement in Phase 5"
+	@echo "Deploying observability stack..."
+	@kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+	@kubectl create namespace logging --dry-run=client -o yaml | kubectl apply -f -
+	@kubectl apply -f observability/prometheus/mongodb-exporter.yaml
+	@kubectl apply -f observability/prometheus/servicemonitor.yaml
+	@kubectl apply -f observability/prometheus/prometheus-rules.yaml
+	@kubectl apply -f observability/alerting/critical-alerts.yaml
+	@kubectl apply -f observability/logging/fluent-bit-config.yaml
+	@kubectl apply -f observability/logging/fluent-bit-daemonset.yaml
+	@kubectl apply -f observability/logging/loki-datasource.yaml
+	@echo "Observability stack deployed."
+	@echo "Import Grafana dashboards from observability/grafana/*.json"
 
 .PHONY: deploy-cdc
 deploy-cdc: ## Deploy Kafka (Strimzi) + Debezium connector
-	@echo "TODO: implement in Phase 5"
+	@echo "Deploying CDC pipeline..."
+	@kubectl apply -f cdc/kafka/strimzi-operator.yaml
+	@echo "Install Strimzi operator via Helm (see cdc/kafka/strimzi-operator.yaml)"
+	@kubectl apply -f cdc/kafka/kafka-cluster.yaml
+	@echo "Waiting for Kafka cluster to become ready..."
+	@kubectl wait kafka/mongodb-cdc -n kafka --for=condition=Ready \
+		--timeout=300s 2>/dev/null || \
+		echo "Timeout waiting for Kafka cluster (may still be initializing)."
+	@kubectl apply -f cdc/kafka/kafka-topic.yaml
+	@kubectl apply -f cdc/debezium/mongodb-connector.yaml
+	@echo "CDC pipeline deployed (Kafka + Debezium + topics)."
 
 .PHONY: deploy-backup
 deploy-backup: ## Configure PBM + MinIO + schedules
