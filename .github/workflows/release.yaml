@@ -87,15 +87,29 @@ jobs:
           helm repo add percona https://percona.github.io/percona-helm-charts/
           helm repo update percona
           helm upgrade --install psmdb-operator-crds percona/psmdb-operator-crds \
-            --namespace mongodb-operator
+            --namespace mongodb-operator \
+            --version 1.22.0
           helm upgrade --install psmdb-operator percona/psmdb-operator \
             --namespace mongodb-operator \
             -f operator/percona-server-mongodb-operator/values.yaml \
+            --version 1.22.0 \
             --wait --timeout 120s
 
       - name: Deploy MongoDB replica set
         run: |
           kubectl create namespace mongodb --dry-run=client -o yaml | kubectl apply -f -
+          kubectl create secret generic mongodb-rs-secrets \
+            -n mongodb \
+            --from-literal=MONGODB_DATABASE_ADMIN_USER=databaseAdmin \
+            --from-literal=MONGODB_DATABASE_ADMIN_PASSWORD=databaseAdmin123 \
+            --from-literal=MONGODB_CLUSTER_ADMIN_USER=clusterAdmin \
+            --from-literal=MONGODB_CLUSTER_ADMIN_PASSWORD=clusterAdmin123 \
+            --from-literal=MONGODB_USER_ADMIN_USER=userAdmin \
+            --from-literal=MONGODB_USER_ADMIN_PASSWORD=userAdmin123 \
+            --from-literal=MONGODB_CLUSTER_MONITOR_USER=clusterMonitor \
+            --from-literal=MONGODB_CLUSTER_MONITOR_PASSWORD=clusterMonitor123 \
+            --from-literal=MONGODB_BACKUP_USER=backup \
+            --from-literal=MONGODB_BACKUP_PASSWORD=backup123
           kubectl apply -k clusters/replicaset/
           echo "Waiting for operator to create pods..."
           for i in $(seq 1 60); do

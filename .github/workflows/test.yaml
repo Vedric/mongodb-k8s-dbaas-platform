@@ -52,10 +52,12 @@ jobs:
           helm repo add percona https://percona.github.io/percona-helm-charts/
           helm repo update percona
           helm upgrade --install psmdb-operator-crds percona/psmdb-operator-crds \
-            --namespace "${OPERATOR_NAMESPACE}"
+            --namespace "${OPERATOR_NAMESPACE}" \
+            --version 1.22.0
           helm upgrade --install psmdb-operator percona/psmdb-operator \
             --namespace "${OPERATOR_NAMESPACE}" \
             -f operator/percona-server-mongodb-operator/values.yaml \
+            --version 1.22.0 \
             --wait --timeout 120s
 
       - name: Deploy MongoDB replica set
