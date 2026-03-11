@@ -69,6 +69,33 @@ jobs:
             echo "No Helm charts found, skipping."
           fi
 
+  gofmt:
+    name: Go Format
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Check gofmt
+        run: |
+          gofiles=$(find . -name '*.go' -type f)
+          if [ -n "$gofiles" ]; then
+            unformatted=$(gofmt -l $gofiles)
+            if [ -n "$unformatted" ]; then
+              echo "ERROR: The following Go files are not formatted:"
+              echo "$unformatted"
+              exit 1
+            fi
+            echo "All Go files are properly formatted."
+          else
+            echo "No Go files found, skipping."
+          fi
+
   gitleaks:
     name: Secret Scanning
     runs-on: ubuntu-latest
