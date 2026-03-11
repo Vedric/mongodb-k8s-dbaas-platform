@@ -62,6 +62,18 @@ jobs:
         run: |
           kubectl create namespace "${MONGODB_NAMESPACE}" \
             --dry-run=client -o yaml | kubectl apply -f -
+          kubectl create secret generic mongodb-rs-secrets \
+            -n "${MONGODB_NAMESPACE}" \
+            --from-literal=MONGODB_DATABASE_ADMIN_USER=databaseAdmin \
+            --from-literal=MONGODB_DATABASE_ADMIN_PASSWORD=databaseAdmin123 \
+            --from-literal=MONGODB_CLUSTER_ADMIN_USER=clusterAdmin \
+            --from-literal=MONGODB_CLUSTER_ADMIN_PASSWORD=clusterAdmin123 \
+            --from-literal=MONGODB_USER_ADMIN_USER=userAdmin \
+            --from-literal=MONGODB_USER_ADMIN_PASSWORD=userAdmin123 \
+            --from-literal=MONGODB_CLUSTER_MONITOR_USER=clusterMonitor \
+            --from-literal=MONGODB_CLUSTER_MONITOR_PASSWORD=clusterMonitor123 \
+            --from-literal=MONGODB_BACKUP_USER=backup \
+            --from-literal=MONGODB_BACKUP_PASSWORD=backup123
           kubectl apply -k clusters/replicaset/
 
       - name: Wait for replica set to be ready
@@ -97,8 +109,10 @@ jobs:
           kubectl get pods -A
           echo "=== Events ==="
           kubectl get events -n "${MONGODB_NAMESPACE}" --sort-by='.lastTimestamp'
+          echo "=== PSMDB CR status ==="
+          kubectl get psmdb -n "${MONGODB_NAMESPACE}" -o yaml || true
           echo "=== Operator logs ==="
-          kubectl logs -n "${OPERATOR_NAMESPACE}" -l app.kubernetes.io/name=percona-server-mongodb-operator \
+          kubectl logs -n "${OPERATOR_NAMESPACE}" deploy/psmdb-operator \
             --tail=100 || true
           echo "=== MongoDB pod logs ==="
           for pod in $(kubectl get pods -n "${MONGODB_NAMESPACE}" -o name); do
