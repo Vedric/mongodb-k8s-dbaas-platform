@@ -75,6 +75,7 @@ jobs:
         with:
           cluster_name: mongodb-dbaas
           config: scripts/kind-config.yaml
+          node_image: kindest/node:v1.29.12
 
       - name: Install Helm
         uses: azure/setup-helm@v4
@@ -130,7 +131,12 @@ jobs:
           sudo apt-get install -y -qq bats jq
 
       - name: Run bats tests
-        run: bats tests/bats/test_replicaset_health.bats
+        run: |
+          export MONGODB_NAMESPACE="mongodb"
+          export MONGODB_CLUSTER="mongodb-rs"
+          export MONGODB_RS_NAME="rs0"
+          export MONGODB_RS_MEMBERS="3"
+          bats tests/bats/test_replicaset_health.bats
 
       - name: Debug on failure
         if: failure()
@@ -138,11 +144,17 @@ jobs:
           echo "=== Pod status ==="
           kubectl get pods -A
           echo "=== Events ==="
-          kubectl get events -n mongodb --sort-by='.lastTimestamp' | tail -30
+          kubectl get events -n mongodb --sort-by='.lastTimestamp'
+          echo "=== PSMDB CR status ==="
+          kubectl get psmdb -n mongodb -o yaml || true
           echo "=== Operator logs ==="
-          kubectl logs -n mongodb-operator \
-            -l app.kubernetes.io/name=percona-server-mongodb-operator \
-            --tail=50 || true
+          kubectl logs -n mongodb-operator deploy/psmdb-operator \
+            --tail=100 || true
+          echo "=== MongoDB pod logs ==="
+          for pod in $(kubectl get pods -n mongodb -o name); do
+            echo "--- ${pod} ---"
+            kubectl logs -n mongodb "${pod}" -c mongod --tail=50 || true
+          done
 
   release:
     name: Create GitHub Release
