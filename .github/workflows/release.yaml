@@ -112,18 +112,34 @@ jobs:
             --from-literal=MONGODB_BACKUP_USER=backup \
             --from-literal=MONGODB_BACKUP_PASSWORD=backup123
           kubectl apply -k clusters/replicaset/
-          echo "Waiting for operator to create pods..."
-          for i in $(seq 1 60); do
-            if kubectl get pods -n mongodb -l "app.kubernetes.io/instance=mongodb-rs" 2>/dev/null | grep -q "mongodb-rs"; then
-              echo "Pods found after ${i}s"
+
+      - name: Wait for replica set to be ready
+        run: |
+          echo "Waiting for all 3 replica set pods to exist..."
+          for i in $(seq 1 120); do
+            pod_count=$(kubectl get pods -n mongodb \
+              -l "app.kubernetes.io/instance=mongodb-rs" \
+              --no-headers 2>/dev/null | wc -l)
+            if [ "${pod_count}" -ge 3 ]; then
+              echo "All 3 pods exist after $((i * 5))s"
               break
             fi
+            echo "  ${pod_count}/3 pods exist (attempt ${i})..."
             sleep 5
           done
-          echo "Waiting for replica set pods..."
+          echo "Waiting for all pods to become ready..."
           kubectl wait --for=condition=ready pod \
-            -l app.kubernetes.io/instance=mongodb-rs \
-            -n mongodb --timeout=300s || true
+            -l "app.kubernetes.io/instance=mongodb-rs" \
+            -n mongodb \
+            --timeout=600s
+          echo "Replica set pods are ready."
+          kubectl get pods -n mongodb
+          echo "Waiting for PSMDB cluster to initialize..."
+          kubectl wait --for=jsonpath='{.status.state}'=ready \
+            psmdb/mongodb-rs \
+            -n mongodb \
+            --timeout=300s
+          echo "MongoDB replica set is fully initialized."
 
       - name: Install bats
         run: |
