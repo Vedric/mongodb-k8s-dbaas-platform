@@ -1,0 +1,25 @@
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: mongodb-sharded-storage
+  labels:
+    app.kubernetes.io/name: mongodb-storage
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: kustomize
+  annotations:
+    description: >-
+      StorageClass optimized for MongoDB sharded cluster workloads.
+      Shared by config servers, shard replica sets, and mongos instances.
+      Uses WaitForFirstConsumer to ensure data locality and
+      Retain policy for defense-in-depth data protection.
+    storageclass.kubernetes.io/is-default-class: "false"
+# For kind/local development: rancher.io/local-path
+# For AWS EKS: ebs.csi.aws.com
+# For Azure AKS: disk.csi.azure.com
+# For GCP GKE: pd.csi.storage.gke.io
+provisioner: rancher.io/local-path
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Retain
+allowVolumeExpansion: true
