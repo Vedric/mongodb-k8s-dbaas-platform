@@ -1,0 +1,41 @@
+---
+# Grafana datasource configuration for Loki.
+# Auto-provisions Loki as a datasource when deployed alongside Grafana.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-loki-datasource
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: grafana-loki-datasource
+    app.kubernetes.io/component: logging
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: platform-team
+    grafana_datasource: "true"
+  annotations:
+    description: >-
+      Grafana datasource provisioning for Loki. Enables log exploration
+      and correlation with Prometheus metrics in Grafana dashboards.
+data:
+  loki-datasource.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Loki
+        type: loki
+        access: proxy
+        url: http://loki.logging.svc.cluster.local:3100
+        isDefault: false
+        jsonData:
+          maxLines: 1000
+          timeout: 60
+          derivedFields:
+            - datasourceUid: prometheus
+              matcherRegex: '"namespace":"(.*?)"'
+              name: Namespace
+              url: '/explore?orgId=1&left=["now-1h","now","Loki",{"expr":"{namespace=\"${__value.raw}\"}"}]'
+            - datasourceUid: prometheus
+              matcherRegex: '"pod":"(.*?)"'
+              name: Pod
+              url: '/explore?orgId=1&left=["now-1h","now","Loki",{"expr":"{pod=\"${__value.raw}\"}"}]'
+        version: 1
+        editable: true
