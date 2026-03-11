@@ -1,0 +1,27 @@
+---
+# Example: Team Alpha requests a Small MongoDB instance for development
+apiVersion: dbaas.platform.local/v1alpha1
+kind: MongoDBInstanceClaim
+metadata:
+  name: team-alpha-dev-db
+  namespace: default
+  labels:
+    app.kubernetes.io/name: team-alpha-dev-db
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: crossplane
+    team: alpha
+    environment: dev
+spec:
+  parameters:
+    teamName: alpha
+    environment: dev
+    size: S
+    version: "7.0"
+    backupEnabled: false
+    monitoringEnabled: false
+  compositionSelector:
+    matchLabels:
+      dbaas.platform.local/provider: percona
+  writeConnectionSecretToRef:
+    name: team-alpha-dev-db-conn
