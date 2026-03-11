@@ -6,6 +6,7 @@ resources:
   - storage-class.yaml
   - cr-replicaset.yaml
 
-commonLabels:
-  app.kubernetes.io/part-of: mongodb-dbaas-platform
-  app.kubernetes.io/managed-by: kustomize
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: mongodb-dbaas-platform
+      app.kubernetes.io/managed-by: kustomize
