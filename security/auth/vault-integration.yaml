@@ -1,0 +1,157 @@
+---
+# Vault Integration for Dynamic MongoDB Credential Rotation
+#
+# This configuration uses the Vault Agent Injector to dynamically generate
+# and rotate MongoDB credentials. It integrates with the
+# vault-k8s-enterprise-secrets-platform project.
+#
+# Prerequisites:
+#   1. HashiCorp Vault deployed with the Kubernetes auth method enabled
+#   2. Vault Agent Injector (vault-k8s) installed in the cluster
+#   3. MongoDB database secrets engine configured in Vault
+#   4. Vault policy and role created for the MongoDB namespace
+#
+# Vault Database Secrets Engine configuration:
+#   vault secrets enable database
+#   vault write database/config/mongodb-rs \
+#     plugin_name=mongodb-database-plugin \
+#     allowed_roles="mongodb-app-role" \
+#     connection_url="mongodb://{{username}}:{{password}}@mongodb-rs-rs0.mongodb.svc:27017/admin?ssl=true" \
+#     username="vaultAdmin" \
+#     password="<initial-password>"
+#
+#   vault write database/roles/mongodb-app-role \
+#     db_name=mongodb-rs \
+#     creation_statements='{ "db": "admin", "roles": [{"role": "readWrite", "db": "appdb"}] }' \
+#     default_ttl="1h" \
+#     max_ttl="24h"
+
+# ServiceAccount for Vault authentication
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mongodb-vault-auth
+  namespace: mongodb
+  labels:
+    app.kubernetes.io/name: mongodb-vault-auth
+    app.kubernetes.io/component: vault
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: kustomize
+  annotations:
+    description: >-
+      ServiceAccount used by Vault Agent Injector for Kubernetes auth
+      method. Bound to a Vault role with database secrets engine access.
+---
+# Example application deployment with Vault Agent Injector annotations.
+# This demonstrates how an application pod gets dynamic MongoDB credentials
+# injected as a file, with automatic TTL-based rotation.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongodb-vault-demo
+  namespace: mongodb
+  labels:
+    app.kubernetes.io/name: mongodb-vault-demo
+    app.kubernetes.io/component: vault-demo
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: kustomize
+  annotations:
+    description: >-
+      Demo deployment showing Vault Agent Injector integration for
+      dynamic MongoDB credential injection and rotation.
+spec:
+  replicas: 0  # Disabled by default - set to 1 to test
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mongodb-vault-demo
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mongodb-vault-demo
+        app.kubernetes.io/component: vault-demo
+        app.kubernetes.io/part-of: mongodb-dbaas-platform
+      annotations:
+        # Vault Agent Injector annotations
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "mongodb-app-role"
+
+        # Inject MongoDB credentials as a file
+        vault.hashicorp.com/agent-inject-secret-mongodb-creds: "database/creds/mongodb-app-role"
+        vault.hashicorp.com/agent-inject-template-mongodb-creds: |
+          {{- with secret "database/creds/mongodb-app-role" -}}
+          MONGODB_URI=mongodb://{{ .Data.username }}:{{ .Data.password }}@mongodb-rs-rs0.mongodb.svc:27017/appdb?ssl=true&authSource=admin
+          MONGODB_USERNAME={{ .Data.username }}
+          MONGODB_PASSWORD={{ .Data.password }}
+          {{- end }}
+
+        # Enable credential rotation (re-render when lease is near expiry)
+        vault.hashicorp.com/agent-inject-command-mongodb-creds: "/bin/sh -c 'kill -HUP $(pidof app) 2>/dev/null || true'"
+        vault.hashicorp.com/agent-run-as-user: "1000"
+        vault.hashicorp.com/agent-run-as-group: "1000"
+    spec:
+      serviceAccountName: mongodb-vault-auth
+      containers:
+        - name: app
+          image: busybox:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "MongoDB credentials available at /vault/secrets/mongodb-creds"
+              echo "Credentials rotate automatically based on Vault TTL (default: 1h)"
+              cat /vault/secrets/mongodb-creds 2>/dev/null || echo "No credentials yet"
+              sleep infinity
+          resources:
+            limits:
+              cpu: 100m
+              memory: 64Mi
+            requests:
+              cpu: 50m
+              memory: 32Mi
+---
+# Vault policy (for reference - apply via vault CLI or Terraform)
+# This is stored as a ConfigMap for documentation purposes only.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vault-policy-reference
+  namespace: mongodb
+  labels:
+    app.kubernetes.io/name: vault-policy-reference
+    app.kubernetes.io/component: vault
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: kustomize
+  annotations:
+    description: >-
+      Reference Vault policy for MongoDB credential access.
+      Apply via: vault policy write mongodb-app vault-policy.hcl
+    cross-project-ref: "vault-k8s-enterprise-secrets-platform"
+data:
+  vault-policy.hcl: |
+    # Allow reading dynamic MongoDB credentials
+    path "database/creds/mongodb-app-role" {
+      capabilities = ["read"]
+    }
+
+    # Allow renewing leases
+    path "sys/leases/renew" {
+      capabilities = ["create"]
+    }
+
+    # Allow looking up own token
+    path "auth/token/lookup-self" {
+      capabilities = ["read"]
+    }
+  vault-auth-config.sh: |
+    #!/usr/bin/env bash
+    # Configure Vault Kubernetes auth method for MongoDB namespace
+    vault auth enable kubernetes 2>/dev/null || true
+
+    vault write auth/kubernetes/config \
+      kubernetes_host="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}"
+
+    vault write auth/kubernetes/role/mongodb-app-role \
+      bound_service_account_names=mongodb-vault-auth \
+      bound_service_account_namespaces=mongodb \
+      policies=mongodb-app \
+      ttl=1h

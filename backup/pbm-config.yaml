@@ -1,0 +1,72 @@
+---
+# PBM (Percona Backup for MongoDB) Configuration
+# Applied via the PerconaServerMongoDB CR backup section.
+#
+# This ConfigMap documents the PBM storage configuration.
+# The actual PBM config is embedded in the Percona CR.
+#
+# S3 endpoint: minio.mongodb-backup.svc:9000 (local)
+# Bucket: mongodb-backups
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pbm-config
+  namespace: mongodb
+  labels:
+    app.kubernetes.io/name: pbm-config
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: kustomize
+  annotations:
+    description: >-
+      PBM storage configuration reference. Actual backup config is
+      defined in the PerconaServerMongoDB CR spec.backup section.
+data:
+  # Percona CR backup section reference:
+  # Add this to the PerconaServerMongoDB CR:
+  #
+  # spec:
+  #   backup:
+  #     enabled: true
+  #     image: percona/percona-backup-mongodb:2.4.1
+  #     storages:
+  #       s3-minio:
+  #         type: s3
+  #         s3:
+  #           bucket: mongodb-backups
+  #           region: us-east-1
+  #           endpointUrl: http://minio.mongodb-backup.svc:9000
+  #           credentialsSecret: minio-s3-credentials
+  #           insecureSkipTLSVerify: true  # MinIO local dev only
+  #     tasks:
+  #       - name: daily-snapshot
+  #         enabled: true
+  #         schedule: "0 2 * * *"
+  #         storageName: s3-minio
+  #         compressionType: gzip
+  #       - name: oplog-continuous
+  #         enabled: true
+  #         type: oplog
+  #         schedule: "*/10 * * * *"
+  #         storageName: s3-minio
+
+  storage-type: "s3"
+  storage-endpoint: "http://minio.mongodb-backup.svc:9000"
+  storage-bucket: "mongodb-backups"
+  compression: "gzip"
+---
+# S3 credentials for PBM to access MinIO
+apiVersion: v1
+kind: Secret
+metadata:
+  name: minio-s3-credentials
+  namespace: mongodb
+  labels:
+    app.kubernetes.io/name: minio-s3-credentials
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+type: Opaque
+stringData:
+  AWS_ACCESS_KEY_ID: "minioadmin"
+  AWS_SECRET_ACCESS_KEY: "REPLACE_WITH_SECURE_PASSWORD"
