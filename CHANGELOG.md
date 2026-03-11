@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.0.2 - 2026-03-11
+
+### Fixed
+
+- Migrate deprecated `spec.mongod` to `replsets[].configuration` inline format (Percona Operator v1.22.0)
+- Remove invalid `cacheSizeRatio` mongod config option causing CrashLoopBackOff
+- Fix operator RBAC: `watchAllNamespaces: true` for cluster-wide CR reconciliation
+- Add required CRD fields: `nonvoting.size`, `arbiter.size`, `backup.image`, `pmm.image`
+- Pin kind cluster to Kubernetes v1.29.12 for operator compatibility
+- Fix CI wait logic: wait for all 3 StatefulSet pods and PSMDB ready state
+- Fix bats tests: authenticate with databaseAdmin credentials from users Secret
+- Create mongodb-rs-secrets before deploying replica set in CI
+- Pin Helm chart versions to 1.22.0 in release workflow
+
+### Changed
+
+- Upgrade `actions/checkout` from v4 to v5 (Node.js 24 support)
+- Add `cache-dependency-path` for Go cache in lint workflow
+- Migrate kustomize `commonLabels` to `labels[].pairs` format
+- Fix yamllint truthy warnings (`on:` to `"on":`) in all workflow files
+- Increase CI job timeout to 30 minutes for sequential pod creation
+
 ## v1.0.1 - 2026-03-11
 
 ### Security
