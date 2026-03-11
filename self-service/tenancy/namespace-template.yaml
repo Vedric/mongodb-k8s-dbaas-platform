@@ -1,0 +1,23 @@
+---
+# Namespace template for tenant MongoDB instances.
+# This template is applied by the Crossplane Composition or manually
+# for teams that require a pre-provisioned namespace.
+#
+# Replace TEAM_NAME and ENVIRONMENT with actual values.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mongodb-TEAM_NAME-ENVIRONMENT
+  labels:
+    app.kubernetes.io/name: mongodb-TEAM_NAME-ENVIRONMENT
+    app.kubernetes.io/component: namespace
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: platform-team
+    dbaas.platform.local/tenant: "true"
+    dbaas.platform.local/team: TEAM_NAME
+    dbaas.platform.local/environment: ENVIRONMENT
+  annotations:
+    description: >-
+      Tenant namespace for team TEAM_NAME in the ENVIRONMENT environment.
+      Provisioned as part of the MongoDB DBaaS self-service platform.
+    owner: TEAM_NAME
