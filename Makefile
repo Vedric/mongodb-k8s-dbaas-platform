@@ -110,7 +110,18 @@ deploy-cdc: ## Deploy Kafka (Strimzi) + Debezium connector
 
 .PHONY: deploy-backup
 deploy-backup: ## Configure PBM + MinIO + schedules
-	@echo "TODO: implement in Phase 3"
+	@echo "Deploying backup infrastructure..."
+	@kubectl create namespace mongodb-backup --dry-run=client -o yaml | kubectl apply -f -
+	@kubectl apply -f backup/minio/deployment.yaml
+	@kubectl apply -f backup/minio/service.yaml
+	@kubectl apply -f backup/pbm-config.yaml
+	@kubectl apply -f backup/schedule-daily-snapshot.yaml
+	@kubectl apply -f backup/schedule-oplog-continuous.yaml
+	@echo "Waiting for MinIO to become ready..."
+	@kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=minio \
+		-n mongodb-backup --timeout=120s 2>/dev/null || \
+		echo "Timeout waiting for MinIO pod."
+	@echo "Backup infrastructure deployed."
 
 # ──────────────────────────────────────────────
 # Data & utilities

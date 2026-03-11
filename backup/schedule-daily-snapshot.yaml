@@ -1,0 +1,41 @@
+---
+# Daily Full Snapshot Backup Schedule
+#
+# This manifest documents the PBM backup task configuration
+# to be added to the PerconaServerMongoDB CR.
+#
+# Schedule: Daily at 02:00 UTC
+# Type: Physical (hot backup)
+# Retention: 7 days
+# Compression: gzip
+# Storage: MinIO (s3-minio)
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backup-schedule-daily
+  namespace: mongodb
+  labels:
+    app.kubernetes.io/name: backup-schedule-daily
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: kustomize
+  annotations:
+    description: >-
+      Daily full snapshot backup schedule documentation.
+      Applied via the PerconaServerMongoDB CR spec.backup.tasks section.
+data:
+  schedule-name: "daily-snapshot"
+  cron-expression: "0 2 * * *"
+  backup-type: "physical"
+  compression: "gzip"
+  retention-days: "7"
+  storage: "s3-minio"
+  # Percona CR task definition:
+  cr-task-definition: |
+    - name: daily-snapshot
+      enabled: true
+      schedule: "0 2 * * *"
+      storageName: s3-minio
+      compressionType: gzip
+      keep: 7

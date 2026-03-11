@@ -1,0 +1,38 @@
+---
+# Continuous Oplog Backup Schedule
+#
+# Enables Point-in-Time Recovery (PITR) by continuously capturing
+# the MongoDB oplog at 10-minute intervals.
+#
+# Schedule: Every 10 minutes
+# Type: Oplog (incremental)
+# Purpose: PITR granularity for RPO < 15 minutes
+# Storage: MinIO (s3-minio)
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backup-schedule-oplog
+  namespace: mongodb
+  labels:
+    app.kubernetes.io/name: backup-schedule-oplog
+    app.kubernetes.io/component: backup
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: kustomize
+  annotations:
+    description: >-
+      Continuous oplog backup schedule for PITR capability.
+      Captures oplog every 10 minutes to S3-compatible storage.
+      Applied via the PerconaServerMongoDB CR spec.backup section.
+data:
+  schedule-name: "oplog-continuous"
+  cron-expression: "*/10 * * * *"
+  backup-type: "oplog"
+  storage: "s3-minio"
+  rpo-target: "15 minutes"
+  # Percona CR PITR definition:
+  cr-pitr-definition: |
+    pitr:
+      enabled: true
+      oplogSpanMin: 10
+      compressionType: gzip
