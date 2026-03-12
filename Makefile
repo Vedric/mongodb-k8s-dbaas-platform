@@ -150,6 +150,23 @@ deploy-backup: ## Configure PBM + MinIO + schedules
 		echo "Timeout waiting for MinIO pod."
 	@echo "Backup infrastructure deployed."
 
+.PHONY: deploy-argocd
+deploy-argocd: ## Deploy ArgoCD with App of Apps pattern
+	@echo "Deploying ArgoCD..."
+	@kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+	@helm repo add argo https://argoproj.github.io/argo-helm 2>/dev/null || true
+	@helm repo update argo
+	@helm upgrade --install argocd argo/argo-cd \
+		--namespace argocd \
+		-f gitops/argocd/values.yaml \
+		--wait --timeout 300s
+	@echo "ArgoCD installed. Deploying App of Apps..."
+	@kubectl apply -f gitops/argocd/apps/root-app.yaml
+	@kubectl apply -f gitops/argocd/appsets/tenant-claims.yaml
+	@echo "ArgoCD deployed with App of Apps pattern."
+	@echo "Access ArgoCD UI: kubectl port-forward svc/argocd-server 8080:80 -n argocd"
+	@echo "Credentials: admin / admin"
+
 # ──────────────────────────────────────────────
 # Data & utilities
 # ──────────────────────────────────────────────
