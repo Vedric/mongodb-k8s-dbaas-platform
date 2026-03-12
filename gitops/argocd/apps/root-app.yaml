@@ -1,0 +1,34 @@
+---
+# Root Application - App of Apps pattern
+# This Application manages all platform component Applications.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mongodb-dbaas-platform
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: root-app
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Vedric/mongodb-k8s-dbaas-platform.git
+    targetRevision: main
+    path: gitops/argocd/apps
+    directory:
+      recurse: false
+      include: "*.yaml"
+      exclude: "root-app.yaml"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

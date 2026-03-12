@@ -1,0 +1,47 @@
+---
+# ApplicationSet for tenant self-service claims.
+# Automatically creates ArgoCD Applications from Crossplane claim files.
+# ArgoCD syncs the Claims, Crossplane fulfills them.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: tenant-claims
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: tenant-claims
+    app.kubernetes.io/component: self-service
+    app.kubernetes.io/part-of: mongodb-dbaas-platform
+    app.kubernetes.io/managed-by: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: https://github.com/Vedric/mongodb-k8s-dbaas-platform.git
+        revision: main
+        files:
+          - path: "self-service/crossplane/examples/*-claim.yaml"
+  template:
+    metadata:
+      name: "tenant-{{.path.basenameNormalized}}"
+      namespace: argocd
+      labels:
+        app.kubernetes.io/name: "tenant-{{.path.basenameNormalized}}"
+        app.kubernetes.io/component: tenant-database
+        app.kubernetes.io/part-of: mongodb-dbaas-platform
+        app.kubernetes.io/managed-by: argocd
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/Vedric/mongodb-k8s-dbaas-platform.git
+        targetRevision: main
+        path: "{{.path.path}}"
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{.path.basenameNormalized}}"
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

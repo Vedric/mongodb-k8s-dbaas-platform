@@ -1,0 +1,75 @@
+---
+# ArgoCD Helm values for kind development cluster.
+# Minimal resource footprint, single replica, no HA.
+
+# Global settings
+global:
+  image:
+    tag: "v2.14.11"
+
+# Server configuration
+server:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+  service:
+    type: ClusterIP
+
+# Repo server
+repoServer:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+# Application controller
+controller:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+# Redis
+redis:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      memory: 128Mi
+
+# Disable Dex (SSO not needed for demos)
+dex:
+  enabled: false
+
+# Disable notifications (not needed for demos)
+notifications:
+  enabled: false
+
+# ApplicationSet controller
+applicationSet:
+  enabled: true
+  replicas: 1
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      memory: 128Mi
+
+# Configure initial admin password (bcrypt hash of "admin")
+configs:
+  params:
+    server.insecure: true
+  secret:
+    argocdServerAdminPassword: "$2a$10$rRyBsGSHK6.uc8fntPwVIuLVHgsAhAX7TcdrqW/RADU0uh7CaChLa"
