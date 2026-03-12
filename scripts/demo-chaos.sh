@@ -7,7 +7,6 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # Configuration
 NAMESPACE="${NAMESPACE:-mongodb}"
@@ -245,6 +244,8 @@ echo ""
 log "========================================="
 log "  Chaos Demo Results"
 log "========================================="
+log "  Old primary:       ${PRIMARY_POD}"
+log "  New primary:       ${NEW_PRIMARY:-N/A}"
 log "  Failover time:     ${FAILOVER_DURATION:-N/A}s"
 log "  Recovery time:     ${RECOVERY_DURATION:-N/A}s"
 log "  Total duration:    ${TOTAL_DURATION}s"
