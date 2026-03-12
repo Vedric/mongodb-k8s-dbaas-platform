@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.0.5 - 2026-03-12
+
+### Fixed
+
+- 📌 Pin kind node image to `v1.29.12` in bootstrap script for Percona Operator compatibility
+- 🔐 Create `mongodb-rs-secrets` before CR deployment in `bootstrap.sh`
+- 🔑 Add credential-based authentication to `seed-data.sh` for seeding with auth enabled
+
 ## v1.0.4 - 2026-03-11
 
 ### Added

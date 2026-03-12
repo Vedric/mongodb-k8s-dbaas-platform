@@ -34,10 +34,33 @@ usage() {
   exit 0
 }
 
+get_admin_credentials() {
+  local secret_name="${CLUSTER_NAME}-secrets"
+  local user pass
+  user=$(kubectl get secret "${secret_name}" -n "${NAMESPACE}" \
+    -o jsonpath='{.data.MONGODB_DATABASE_ADMIN_USER}' 2>/dev/null | base64 -d)
+  pass=$(kubectl get secret "${secret_name}" -n "${NAMESPACE}" \
+    -o jsonpath='{.data.MONGODB_DATABASE_ADMIN_PASSWORD}' 2>/dev/null | base64 -d)
+  if [ -n "${user}" ] && [ -n "${pass}" ]; then
+    echo "${user}:${pass}"
+  fi
+}
+
 run_mongosh() {
   local pod="${CLUSTER_NAME}-${RS_NAME}-0"
-  kubectl exec "${pod}" -n "${NAMESPACE}" -c mongod -- \
-    mongosh --quiet --eval "$1" 2>/dev/null
+  local creds
+  creds=$(get_admin_credentials)
+  if [ -n "${creds}" ]; then
+    local user="${creds%%:*}"
+    local pass="${creds#*:}"
+    kubectl exec "${pod}" -n "${NAMESPACE}" -c mongod -- \
+      mongosh --quiet \
+      -u "${user}" -p "${pass}" --authenticationDatabase admin \
+      --eval "$1" 2>/dev/null
+  else
+    kubectl exec "${pod}" -n "${NAMESPACE}" -c mongod -- \
+      mongosh --quiet --eval "$1" 2>/dev/null
+  fi
 }
 
 while [[ $# -gt 0 ]]; do
