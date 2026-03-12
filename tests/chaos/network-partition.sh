@@ -11,7 +11,7 @@ SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
 
 # Defaults
 NAMESPACE="${NAMESPACE:-mongodb}"
-CLUSTER_NAME="${CLUSTER_NAME:-my-cluster}"
+CLUSTER_NAME="${CLUSTER_NAME:-mongodb-rs}"
 RS_NAME="${RS_NAME:-rs0}"
 DRY_RUN=false
 PARTITION_DURATION=30
@@ -44,7 +44,7 @@ operator pods typically include iptables in their container image.
 
 Options:
   --namespace NAME            Kubernetes namespace (env: NAMESPACE, default: mongodb)
-  --cluster-name NAME         Percona cluster name (env: CLUSTER_NAME, default: my-cluster)
+  --cluster-name NAME         Percona cluster name (env: CLUSTER_NAME, default: mongodb-rs)
   --rs-name NAME              Replica set name (env: RS_NAME, default: rs0)
   --partition-duration SEC    How long to maintain the partition (default: 30)
   --detection-timeout SEC     Max seconds to detect membership loss (default: 60)
