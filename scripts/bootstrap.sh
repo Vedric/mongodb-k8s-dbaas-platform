@@ -17,7 +17,7 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # Configuration
 KIND_CLUSTER_NAME="${KIND_CLUSTER_NAME:-mongodb-dbaas}"
-KIND_IMAGE="${KIND_IMAGE:-kindest/node:v1.28.13}"
+KIND_IMAGE="${KIND_IMAGE:-kindest/node:v1.29.12}"
 OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-mongodb-operator}"
 MONGODB_NAMESPACE="${MONGODB_NAMESPACE:-mongodb}"
 HELM_REPO_NAME="percona"
@@ -143,8 +143,25 @@ deploy_mongodb_cluster() {
 
   log "Deploying MongoDB replica set..."
 
-  # Create namespace and apply replica set resources
-  run kubectl create namespace "${MONGODB_NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
+  # Create namespace
+  kubectl create namespace "${MONGODB_NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
+
+  # Create users secret required by the PSMDB CR
+  kubectl create secret generic mongodb-rs-secrets \
+    -n "${MONGODB_NAMESPACE}" \
+    --from-literal=MONGODB_DATABASE_ADMIN_USER=databaseAdmin \
+    --from-literal=MONGODB_DATABASE_ADMIN_PASSWORD=databaseAdmin123 \
+    --from-literal=MONGODB_CLUSTER_ADMIN_USER=clusterAdmin \
+    --from-literal=MONGODB_CLUSTER_ADMIN_PASSWORD=clusterAdmin123 \
+    --from-literal=MONGODB_USER_ADMIN_USER=userAdmin \
+    --from-literal=MONGODB_USER_ADMIN_PASSWORD=userAdmin123 \
+    --from-literal=MONGODB_CLUSTER_MONITOR_USER=clusterMonitor \
+    --from-literal=MONGODB_CLUSTER_MONITOR_PASSWORD=clusterMonitor123 \
+    --from-literal=MONGODB_BACKUP_USER=backup \
+    --from-literal=MONGODB_BACKUP_PASSWORD=backup123 \
+    --dry-run=client -o yaml | kubectl apply -f -
+
+  # Apply replica set resources
   run kubectl apply -k "${PROJECT_ROOT}/clusters/replicaset/"
 
   log "Waiting for replica set pods to become ready..."
