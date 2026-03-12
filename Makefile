@@ -180,6 +180,20 @@ deploy-argocd: ## Deploy ArgoCD with App of Apps pattern
 	@echo "Access ArgoCD UI: kubectl port-forward svc/argocd-server 8080:80 -n argocd"
 	@echo "Credentials: admin / admin"
 
+.PHONY: deploy-api-docs
+deploy-api-docs: ## Deploy Swagger UI with OpenAPI spec
+	@echo "Deploying Swagger UI..."
+	@kubectl create configmap openapi-spec \
+		--from-file=mongodb-dbaas-api.yaml=api/openapi/mongodb-dbaas-api.yaml \
+		-n api-docs --dry-run=client -o yaml | kubectl apply -f -
+	@kubectl apply -f api/swagger-ui/deployment.yaml
+	@echo "Waiting for Swagger UI to be ready..."
+	@kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=swagger-ui \
+		-n api-docs --timeout=120s 2>/dev/null || \
+		echo "Timeout waiting for Swagger UI pod."
+	@echo "Swagger UI deployed."
+	@echo "Access: kubectl port-forward svc/swagger-ui 8081:8081 -n api-docs"
+
 # ──────────────────────────────────────────────
 # Data & utilities
 # ──────────────────────────────────────────────
