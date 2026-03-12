@@ -111,15 +111,28 @@ deploy-observability: ## Deploy Prometheus + Grafana + Loki + Fluent Bit
 	@echo "Deploying observability stack..."
 	@kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
 	@kubectl create namespace logging --dry-run=client -o yaml | kubectl apply -f -
+	@echo "Installing kube-prometheus-stack via Helm..."
+	@helm repo add prometheus-community https://prometheus-community.github.io/helm-charts 2>/dev/null || true
+	@helm repo update prometheus-community
+	@helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+		--namespace monitoring \
+		-f observability/kube-prometheus-stack/values.yaml \
+		--wait --timeout 300s
+	@echo "kube-prometheus-stack installed."
+	@echo "Deploying Grafana dashboard ConfigMaps..."
+	@kubectl apply -k observability/grafana/configmaps/
+	@echo "Deploying MongoDB exporter configuration..."
 	@kubectl apply -f observability/prometheus/mongodb-exporter.yaml
 	@kubectl apply -f observability/prometheus/servicemonitor.yaml
 	@kubectl apply -f observability/prometheus/prometheus-rules.yaml
 	@kubectl apply -f observability/alerting/critical-alerts.yaml
+	@echo "Deploying logging stack..."
 	@kubectl apply -f observability/logging/fluent-bit-config.yaml
 	@kubectl apply -f observability/logging/fluent-bit-daemonset.yaml
 	@kubectl apply -f observability/logging/loki-datasource.yaml
 	@echo "Observability stack deployed."
-	@echo "Import Grafana dashboards from observability/grafana/*.json"
+	@echo "Access Grafana: kubectl port-forward svc/kube-prometheus-stack-grafana 3000:80 -n monitoring"
+	@echo "Credentials: admin / admin"
 
 .PHONY: deploy-cdc
 deploy-cdc: ## Deploy Kafka (Strimzi) + Debezium connector
