@@ -11,7 +11,7 @@ SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
 
 # Defaults
 NAMESPACE="${NAMESPACE:-mongodb}"
-CLUSTER_NAME="${CLUSTER_NAME:-my-cluster}"
+CLUSTER_NAME="${CLUSTER_NAME:-mongodb-rs}"
 RS_NAME="${RS_NAME:-rs0}"
 MAX_LAG=10
 DRY_RUN=false
@@ -45,7 +45,7 @@ This script can be run standalone or called from other chaos test scripts.
 
 Options:
   --namespace NAME        Kubernetes namespace (env: NAMESPACE, default: mongodb)
-  --cluster-name NAME     Percona cluster name (env: CLUSTER_NAME, default: my-cluster)
+  --cluster-name NAME     Percona cluster name (env: CLUSTER_NAME, default: mongodb-rs)
   --rs-name NAME          Replica set name (env: RS_NAME, default: rs0)
   --max-lag SEC           Maximum acceptable replication lag in seconds (default: 10)
   --dry-run               Print checks without executing

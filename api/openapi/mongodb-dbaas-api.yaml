@@ -1,0 +1,249 @@
+---
+openapi: "3.0.3"
+info:
+  title: MongoDB DBaaS Platform API
+  description: |
+    Self-service REST API for provisioning MongoDB instances on Kubernetes.
+    This API wraps Crossplane MongoDBInstanceClaim resources, providing a
+    standard HTTP interface for teams that prefer REST over kubectl.
+  version: v1alpha1
+  contact:
+    name: Platform Team
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:8081/api
+    description: Local development
+
+paths:
+  /v1alpha1/instances:
+    get:
+      summary: List all MongoDB instances
+      operationId: listInstances
+      tags:
+        - instances
+      parameters:
+        - name: teamName
+          in: query
+          description: Filter by team name
+          required: false
+          schema:
+            type: string
+        - name: environment
+          in: query
+          description: Filter by environment
+          required: false
+          schema:
+            type: string
+            enum: [dev, staging, production]
+      responses:
+        "200":
+          description: List of MongoDB instances
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MongoDBInstance"
+                  total:
+                    type: integer
+              example:
+                items:
+                  - name: team-alpha-production
+                    teamName: team-alpha
+                    environment: production
+                    size: M
+                    version: "7.0"
+                    status:
+                      phase: Ready
+                      ready: true
+                      endpoint: team-alpha-production-rs0.mongodb.svc.cluster.local
+                      namespace: team-alpha-production
+                total: 1
+
+    post:
+      summary: Create a new MongoDB instance
+      operationId: createInstance
+      tags:
+        - instances
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInstanceRequest"
+            example:
+              teamName: team-alpha
+              environment: production
+              size: M
+              version: "7.0"
+              backupEnabled: true
+              monitoringEnabled: true
+      responses:
+        "201":
+          description: Instance creation initiated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MongoDBInstance"
+        "400":
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Instance already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /v1alpha1/instances/{name}:
+    get:
+      summary: Get a MongoDB instance by name
+      operationId: getInstance
+      tags:
+        - instances
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: MongoDB instance details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MongoDBInstance"
+        "404":
+          description: Instance not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      summary: Delete a MongoDB instance
+      operationId: deleteInstance
+      tags:
+        - instances
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "202":
+          description: Instance deletion initiated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Instance deletion initiated"
+        "404":
+          description: Instance not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  schemas:
+    CreateInstanceRequest:
+      type: object
+      required:
+        - teamName
+        - environment
+        - size
+      properties:
+        teamName:
+          type: string
+          description: Name of the owning team
+          pattern: "^[a-z][a-z0-9-]{1,28}[a-z0-9]$"
+          minLength: 3
+          maxLength: 30
+          example: team-alpha
+        environment:
+          type: string
+          description: Target environment
+          enum: [dev, staging, production]
+          example: production
+        size:
+          type: string
+          description: "T-shirt size (S: 500m/1Gi/10Gi, M: 1/2Gi/20Gi, L: 2/4Gi/50Gi)"
+          enum: [S, M, L]
+          example: M
+        version:
+          type: string
+          description: MongoDB server version
+          enum: ["6.0", "7.0"]
+          default: "7.0"
+          example: "7.0"
+        backupEnabled:
+          type: boolean
+          description: Enable automated PBM backups
+          default: true
+        monitoringEnabled:
+          type: boolean
+          description: Enable Prometheus metrics exporter
+          default: true
+
+    MongoDBInstance:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Unique instance name (teamName-environment)
+        teamName:
+          type: string
+        environment:
+          type: string
+          enum: [dev, staging, production]
+        size:
+          type: string
+          enum: [S, M, L]
+        version:
+          type: string
+        backupEnabled:
+          type: boolean
+        monitoringEnabled:
+          type: boolean
+        status:
+          type: object
+          properties:
+            phase:
+              type: string
+              enum: [Provisioning, Ready, Error, Deleting]
+            ready:
+              type: boolean
+            endpoint:
+              type: string
+              description: Internal cluster DNS endpoint
+            namespace:
+              type: string
+              description: Kubernetes namespace
+        createdAt:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+      required:
+        - code
+        - message

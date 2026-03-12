@@ -111,15 +111,28 @@ deploy-observability: ## Deploy Prometheus + Grafana + Loki + Fluent Bit
 	@echo "Deploying observability stack..."
 	@kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
 	@kubectl create namespace logging --dry-run=client -o yaml | kubectl apply -f -
+	@echo "Installing kube-prometheus-stack via Helm..."
+	@helm repo add prometheus-community https://prometheus-community.github.io/helm-charts 2>/dev/null || true
+	@helm repo update prometheus-community
+	@helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+		--namespace monitoring \
+		-f observability/kube-prometheus-stack/values.yaml \
+		--wait --timeout 300s
+	@echo "kube-prometheus-stack installed."
+	@echo "Deploying Grafana dashboard ConfigMaps..."
+	@kubectl apply -k observability/grafana/configmaps/
+	@echo "Deploying MongoDB exporter configuration..."
 	@kubectl apply -f observability/prometheus/mongodb-exporter.yaml
 	@kubectl apply -f observability/prometheus/servicemonitor.yaml
 	@kubectl apply -f observability/prometheus/prometheus-rules.yaml
 	@kubectl apply -f observability/alerting/critical-alerts.yaml
+	@echo "Deploying logging stack..."
 	@kubectl apply -f observability/logging/fluent-bit-config.yaml
 	@kubectl apply -f observability/logging/fluent-bit-daemonset.yaml
 	@kubectl apply -f observability/logging/loki-datasource.yaml
 	@echo "Observability stack deployed."
-	@echo "Import Grafana dashboards from observability/grafana/*.json"
+	@echo "Access Grafana: kubectl port-forward svc/kube-prometheus-stack-grafana 3000:80 -n monitoring"
+	@echo "Credentials: admin / admin"
 
 .PHONY: deploy-cdc
 deploy-cdc: ## Deploy Kafka (Strimzi) + Debezium connector
@@ -150,6 +163,37 @@ deploy-backup: ## Configure PBM + MinIO + schedules
 		echo "Timeout waiting for MinIO pod."
 	@echo "Backup infrastructure deployed."
 
+.PHONY: deploy-argocd
+deploy-argocd: ## Deploy ArgoCD with App of Apps pattern
+	@echo "Deploying ArgoCD..."
+	@kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+	@helm repo add argo https://argoproj.github.io/argo-helm 2>/dev/null || true
+	@helm repo update argo
+	@helm upgrade --install argocd argo/argo-cd \
+		--namespace argocd \
+		-f gitops/argocd/values.yaml \
+		--wait --timeout 300s
+	@echo "ArgoCD installed. Deploying App of Apps..."
+	@kubectl apply -f gitops/argocd/apps/root-app.yaml
+	@kubectl apply -f gitops/argocd/appsets/tenant-claims.yaml
+	@echo "ArgoCD deployed with App of Apps pattern."
+	@echo "Access ArgoCD UI: kubectl port-forward svc/argocd-server 8080:80 -n argocd"
+	@echo "Credentials: admin / admin"
+
+.PHONY: deploy-api-docs
+deploy-api-docs: ## Deploy Swagger UI with OpenAPI spec
+	@echo "Deploying Swagger UI..."
+	@kubectl create configmap openapi-spec \
+		--from-file=mongodb-dbaas-api.yaml=api/openapi/mongodb-dbaas-api.yaml \
+		-n api-docs --dry-run=client -o yaml | kubectl apply -f -
+	@kubectl apply -f api/swagger-ui/deployment.yaml
+	@echo "Waiting for Swagger UI to be ready..."
+	@kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=swagger-ui \
+		-n api-docs --timeout=120s 2>/dev/null || \
+		echo "Timeout waiting for Swagger UI pod."
+	@echo "Swagger UI deployed."
+	@echo "Access: kubectl port-forward svc/swagger-ui 8081:8081 -n api-docs"
+
 # ──────────────────────────────────────────────
 # Data & utilities
 # ──────────────────────────────────────────────
@@ -173,6 +217,10 @@ test: ## Run full bats test suite
 test-chaos: ## Run chaos engineering scenarios
 	@echo "Running chaos tests..."
 	@for script in tests/chaos/*.sh; do bash "$$script"; done
+
+.PHONY: demo-chaos
+demo-chaos: ## Run chaos demo (kill primary + failover + recovery)
+	@./scripts/demo-chaos.sh
 
 .PHONY: test-backup
 test-backup: ## Run backup/restore validation cycle

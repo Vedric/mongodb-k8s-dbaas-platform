@@ -1,0 +1,12 @@
+# Example Terraform variables for kind development environment.
+# Copy to terraform.tfvars and adjust as needed.
+
+cluster_name       = "mongodb-dbaas"
+kubernetes_version = "v1.29.12"
+worker_count       = 3
+
+operator_namespace     = "mongodb-operator"
+operator_chart_version = "1.22.0"
+
+deploy_observability = true
+monitoring_namespace = "monitoring"

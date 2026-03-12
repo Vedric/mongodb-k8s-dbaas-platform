@@ -11,7 +11,7 @@ SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
 
 # Defaults
 NAMESPACE="${NAMESPACE:-mongodb}"
-CLUSTER_NAME="${CLUSTER_NAME:-my-cluster}"
+CLUSTER_NAME="${CLUSTER_NAME:-mongodb-rs}"
 RS_NAME="${RS_NAME:-rs0}"
 DRY_RUN=false
 RECOVERY_TIMEOUT=300
@@ -34,7 +34,7 @@ that the member recovers via initial sync with no data loss.
 
 Options:
   --namespace NAME         Kubernetes namespace (env: NAMESPACE, default: mongodb)
-  --cluster-name NAME      Percona cluster name (env: CLUSTER_NAME, default: my-cluster)
+  --cluster-name NAME      Percona cluster name (env: CLUSTER_NAME, default: mongodb-rs)
   --rs-name NAME           Replica set name (env: RS_NAME, default: rs0)
   --recovery-timeout SEC   Max seconds to wait for pod rescheduling (default: 300)
   --sync-timeout SEC       Max seconds to wait for initial sync (default: 600)
