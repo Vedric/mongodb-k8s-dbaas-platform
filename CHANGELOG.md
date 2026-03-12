@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.1.0 - 2026-03-12
+
+### Added
+
+- 📊 **Observability Stack**: Deploy kube-prometheus-stack via Helm with auto-provisioned Grafana dashboards (MongoDB Connections, Replication, WiredTiger, Tenant Overview) via ConfigMap sidecar
+- 🔥 **Chaos Testing Demo**: Full chaos engineering demo script (`make demo-chaos`) with primary kill, failover detection, recovery validation, and Grafana annotations for visual timeline
+- 🏗️ **Terraform IaC Layer**: Kind cluster provisioning with reusable modules for Percona Operator and observability stack, plus EKS environment skeleton for cloud readiness
+- 🚀 **ArgoCD GitOps**: App of Apps pattern with ApplicationSet for tenant self-service claims, complementing Crossplane provisioning (ADR-008)
+- 📡 **OpenAPI Self-Service API**: OpenAPI 3.0 spec mapping Crossplane XRD to REST endpoints, Swagger UI deployment, and Go gateway prototype with dynamic Kubernetes client
+
+### Changed
+
+- 🔧 Align chaos test scripts cluster naming with bootstrap defaults (`mongodb-rs`)
+- 📝 Add Terraform provisioning guide and API self-service guide to documentation
+
 ## v1.0.5 - 2026-03-12
 
 ### Fixed
