@@ -174,6 +174,10 @@ test-chaos: ## Run chaos engineering scenarios
 	@echo "Running chaos tests..."
 	@for script in tests/chaos/*.sh; do bash "$$script"; done
 
+.PHONY: demo-chaos
+demo-chaos: ## Run chaos demo (kill primary + failover + recovery)
+	@./scripts/demo-chaos.sh
+
 .PHONY: test-backup
 test-backup: ## Run backup/restore validation cycle
 	@echo "Running backup validation..."
